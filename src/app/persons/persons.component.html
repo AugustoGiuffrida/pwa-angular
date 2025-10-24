@@ -1,0 +1,8 @@
+<h2>Lista de Personas (Caché: freshness)</h2>
+<p>Esta data prioriza la red (network-first), pero usa caché si estás offline o la red tarda.</p>
+<button (click)="loadPersons()">Cargar Personas</button>
+<ul>
+  <li *ngFor="let person of persons$ | async">
+    {{ person.first_name }} - {{ person.last_name }}
+  </li>
+</ul>

@@ -1,0 +1,8 @@
+<h2>Lista de Contactos (Caché: performance)</h2>
+<p>Esta data prioriza el caché para velocidad (cache-first).</p>
+<button (click)="loadContacts()">Cargar Contactos</button>
+<ul>
+  <li *ngFor="let contact of contacts$ | async">
+    {{ contact.first_name }} - {{ contact.last_name }}
+  </li>
+</ul>

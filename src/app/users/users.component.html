@@ -1,0 +1,8 @@
+<h2>Lista de Usuarios (Sin Caché)</h2>
+<button (click)="loadUsers()">Cargar Usuarios</button>
+
+<ul>
+  <li *ngFor="let user of users$ | async">
+    {{ user.first_name }} {{ user.last_name }} ({{ user.date_of_birth }})
+  </li>
+</ul>

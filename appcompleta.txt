@@ -1,0 +1,389 @@
+#####################################################################
+# CÓDIGO CONSOLIDADO PARA PWA ANGULAR CON CACHÉ DE API
+#
+# Copia y pega el contenido de cada bloque en el archivo correspondiente
+# que se indica en el comentario de cabecera.
+#####################################################################
+
+
+#====================================================================
+# ARCHIVO: src/app/app.config.ts
+# (Configuración principal de la app, provee HttpClient y Service Worker)
+#====================================================================
+
+import { ApplicationConfig, isDevMode } from '@angular/core';
+import { provideRouter, withHashLocation } from '@angular/router';
+import { routes } from './app.routes';
+import { provideServiceWorker } from '@angular/service-worker';
+import { provideHttpClient } from '@angular/common/http';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideRouter(routes, withHashLocation()),
+    
+    // 1. Proveedor de HttpClient para hacer llamadas API
+    provideHttpClient(), 
+    
+    // 2. Proveedor del Service Worker (instalado con 'ng add @angular/pwa')
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000'
+    })
+  ]
+};
+
+
+#====================================================================
+# ARCHIVO: src/app/app.routes.ts
+# (Definición de las rutas de la aplicación)
+#====================================================================
+
+import { Routes } from '@angular/router';
+import { UsersComponent } from './users/users.component';
+import { PersonsComponent } from './persons/persons.component';
+import { ContactsComponent } from './contacts/contacts.component';
+
+export const routes: Routes = [
+  { path: 'users', component: UsersComponent },
+  { path: 'persons', component: PersonsComponent },
+  { path: 'contacts', component: ContactsComponent },
+  { path: '', redirectTo: 'users', pathMatch: 'full' } // Redirige a /users por defecto
+];
+
+
+#====================================================================
+# ARCHIVO: src/app/api.service.ts
+# (Servicio para gestionar las llamadas a la API)
+#====================================================================
+
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ApiService {
+  
+  // URL base de tu mock
+  private baseUrl = 'https://www.mockachino.com/e76d4e5b-ccbc-40';
+
+  constructor(private http: HttpClient) { }
+
+  getUsers(): Observable<any[]> {
+    return this.http.get<any>(`${this.baseUrl}/users`).pipe(
+      map(response => {
+        if (response && typeof response === 'object' && !Array.isArray(response)) {
+          const keys = Object.keys(response);
+          for (const key of keys) {
+            if (Array.isArray(response[key])) {
+              return response[key];
+            }
+          }
+          return [];
+        }
+        return Array.isArray(response) ? response : [];
+      })
+    );
+  }
+
+  getPersons(): Observable<any[]> {
+    return this.http.get<any>(`${this.baseUrl}/persons`).pipe(
+      map(response => {
+        if (response && typeof response === 'object' && !Array.isArray(response)) {
+          const keys = Object.keys(response);
+          for (const key of keys) {
+            if (Array.isArray(response[key])) {
+              return response[key];
+            }
+          }
+          return [];
+        }
+        return Array.isArray(response) ? response : [];
+      })
+    );
+  }
+
+  getContacts(): Observable<any[]> {
+    return this.http.get<any>(`${this.baseUrl}/contacts`).pipe(
+      map(response => {
+        if (response && typeof response === 'object' && !Array.isArray(response)) {
+          const keys = Object.keys(response);
+          for (const key of keys) {
+            if (Array.isArray(response[key])) {
+              return response[key];
+            }
+          }
+          return [];
+        }
+        return Array.isArray(response) ? response : [];
+      })
+    );
+  }
+}
+
+
+#====================================================================
+# ARCHIVO: src/app/users/users.component.ts
+# (Componente 1: Carga con botón, sin caché de SW)
+#====================================================================
+
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ApiService } from '../api.service';
+import { Observable, EMPTY } from 'rxjs';
+
+@Component({
+  selector: 'app-users',
+  standalone: true,
+  imports: [CommonModule], // Importa CommonModule para *ngFor y el pipe 'async'
+  templateUrl: './users.component.html',
+})
+export class UsersComponent {
+  
+  // Usamos un observable para manejar los datos
+  users$!: Observable<any[]>;
+
+  constructor(private apiService: ApiService) {
+    this.users$ = EMPTY; // Inicializa como vacío
+  }
+
+  loadUsers() {
+    this.users$ = this.apiService.getUsers();
+  }
+}
+
+
+#====================================================================
+# ARCHIVO: src/app/users/users.component.html
+# (Plantilla del componente Users)
+#====================================================================
+
+<h2>Lista de Usuarios (Sin Caché)</h2>
+<button (click)="loadUsers()">Cargar Usuarios</button>
+
+<ul>
+  <li *ngFor="let user of users$ | async">
+    {{ user.first_name }} {{ user.last_name }} ({{ user.email }})
+  </li>
+</ul>
+
+
+#====================================================================
+# ARCHIVO: src/app/persons/persons.component.ts
+# (Componente 2: Carga automática, caché 'freshness')
+#====================================================================
+
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ApiService } from '../api.service';
+import { Observable } from 'rxjs';
+
+@Component({
+  selector: 'app-persons',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './persons.component.html',
+})
+export class PersonsComponent implements OnInit {
+  
+  persons$!: Observable<any[]>;
+
+  constructor(private apiService: ApiService) {}
+
+  ngOnInit() {
+    this.persons$ = this.apiService.getPersons();
+  }
+}
+
+
+#====================================================================
+# ARCHIVO: src/app/persons/persons.component.html
+# (Plantilla del componente Persons)
+#====================================================================
+
+<h2>Lista de Personas (Caché: freshness)</h2>
+<p>Esta data prioriza la red (network-first), pero usa caché si estás offline o la red tarda.</p>
+<ul>
+  <li *ngFor="let person of persons$ | async">
+    {{ person.name }} - {{ person.job_title }}
+  </li>
+</ul>
+
+
+#====================================================================
+# ARCHIVO: src/app/contacts/contacts.component.ts
+# (Componente 3: Carga automática, caché 'performance')
+#====================================================================
+
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ApiService } from '../api.service';
+import { Observable } from 'rxjs';
+
+@Component({
+  selector: 'app-contacts',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './contacts.component.html',
+})
+export class ContactsComponent implements OnInit {
+  
+  contacts$!: Observable<any[]>;
+
+  constructor(private apiService: ApiService) {}
+
+  ngOnInit() {
+    this.contacts$ = this.apiService.getContacts();
+  }
+}
+
+
+#====================================================================
+# ARCHIVO: src/app/contacts/contacts.component.html
+# (Plantilla del componente Contacts)
+#====================================================================
+
+<h2>Lista de Contactos (Caché: performance)</h2>
+<p>Esta data prioriza el caché para velocidad (cache-first).</p>
+<ul>
+  <li *ngFor="let contact of contacts$ | async">
+    {{ contact.name }} - {{ contact.phone }}
+  </li>
+</ul>
+
+
+#====================================================================
+# ARCHIVO: src/app/app.component.ts
+# (Componente raíz de la aplicación)
+#====================================================================
+
+import { Component } from '@angular/core';
+import { RouterLink, RouterOutlet } from '@angular/router';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [RouterOutlet, RouterLink], // Añadir RouterLink para la navegación
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css']
+})
+export class AppComponent {
+  title = 'pwa-api-cache';
+}
+
+
+#====================================================================
+# ARCHIVO: src/app/app.component.html
+# (Plantilla del componente raíz, con la navegación)
+#====================================================================
+
+<h1>Mi PWA con Caché</h1>
+
+<nav>
+  <a routerLink="/users">Usuarios (Sin Caché)</a> | 
+  <a routerLink="/persons">Personas (Freshness)</a> | 
+  <a routerLink="/contacts">Contactos (Performance)</a>
+</nav>
+
+<hr>
+
+<router-outlet></router-outlet>
+
+
+#====================================================================
+# ARCHIVO: src/app/app.component.css
+# (Estilos (vacíos) para el componente raíz)
+#====================================================================
+
+/* Puedes añadir estilos globales para la navegación aquí */
+nav {
+  padding: 10px 0;
+}
+
+nav a {
+  margin: 0 10px;
+  font-weight: bold;
+  text-decoration: none;
+  color: #3f51b5;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+
+#====================================================================
+# ARCHIVO: src/main.ts
+# (Archivo de arranque de la aplicación)
+#====================================================================
+
+import { bootstrapApplication } from '@angular/platform-browser';
+import { appConfig } from './app/app.config';
+import { AppComponent } from './app/app.component';
+
+bootstrapApplication(AppComponent, appConfig)
+  .catch((err) => console.error(err));
+
+
+#====================================================================
+# ARCHIVO: ngsw-config.json
+# (Configuración del Service Worker - IMPORTANTE PARA CACHÉ)
+#====================================================================
+
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app",
+      "installMode": "prefetch",
+      "resources": {
+        "files": [
+          "/favicon.ico",
+          "/index.html",
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js"
+        ]
+      }
+    },
+    {
+      "name": "assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/**",
+          "/*.(svg|cur|jpg|jpeg|png|apng|webp|avif|gif|otf|ttf|woff|woff2)"
+        ]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "api-persons-freshness",
+      "urls": [
+        "https://www.mockachino.com/e76d4e5b-ccbc-40/persons"
+      ],
+      "cacheConfig": {
+        "maxSize": 10,
+        "maxAge": "1d",
+        "timeout": "5s",
+        "strategy": "freshness"
+      }
+    },
+    {
+      "name": "api-contacts-performance",
+      "urls": [
+        "https://www.mockachino.com/e76d4e5b-ccbc-40/contacts"
+      ],
+      "cacheConfig": {
+        "maxSize": 10,
+        "maxAge": "7d",
+        "strategy": "performance"
+      }
+    }
+  ]
+}
