@@ -6,12 +6,15 @@ Aplicación Progressive Web App (PWA) construida con Angular que demuestra difer
 
 - ✅ Progressive Web App (PWA)
 - ✅ Service Worker con estrategias de caché configurables
-- ✅ Tres componentes con diferentes estrategias:
+- ✅ Cuatro componentes con diferentes estrategias:
   - **Users**: Sin caché (siempre desde red)
+  - **Users Table**: Tabla paginada y ordenable (sin caché)
   - **Persons**: Caché freshness (network-first)
   - **Contacts**: Caché performance (cache-first)
 - ✅ Hash routing para compatibilidad con servidores estáticos
 - ✅ Componentes standalone de Angular 18
+- ✅ Tabla con ordenamiento por columnas (click en encabezado)
+- ✅ Paginación configurable (5, 10, 20, 50 registros por página)
 
 ## Requisitos
 
@@ -58,6 +61,7 @@ Esto compila y sirve la aplicación en modo producción con http-server en `http
 src/
 ├── app/
 │   ├── users/              # Componente sin caché
+│   ├── users-table/        # Tabla paginada y ordenable
 │   ├── persons/            # Componente con caché freshness
 │   ├── contacts/           # Componente con caché performance
 │   ├── api.service.ts      # Servicio para llamadas API

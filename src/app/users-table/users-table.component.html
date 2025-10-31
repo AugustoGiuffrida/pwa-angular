@@ -1,0 +1,100 @@
+<div class="users-table-container">
+  <div class="header">
+    <h2>Usuarios - Tabla Paginada y Ordenable</h2>
+    <button (click)="loadUsers()" class="refresh-btn" [disabled]="isLoading">
+      {{ isLoading ? 'Cargando...' : '🔄 Recargar' }}
+    </button>
+  </div>
+
+  <!-- Mensaje de error -->
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+  </div>
+
+  <!-- Loading spinner -->
+  <div *ngIf="isLoading" class="loading-spinner">
+    <div class="spinner"></div>
+    <p>Cargando usuarios...</p>
+  </div>
+
+  <!-- Tabla de usuarios -->
+  <div *ngIf="!isLoading && !error" class="table-wrapper">
+    
+    <!-- Controles superiores -->
+    <div class="table-controls">
+      <div class="page-size-control">
+        <label>
+          Mostrar:
+          <select (change)="changePageSize($event)" [value]="pageSize">
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+          registros
+        </label>
+      </div>
+      <div class="record-info">
+        {{ getRecordInfo() }}
+      </div>
+    </div>
+
+    <!-- Tabla -->
+    <table class="users-table">
+      <thead>
+        <tr>
+          <th (click)="sortBy('first_name')" class="sortable">
+            Nombre {{ getSortIcon('first_name') }}
+          </th>
+          <th (click)="sortBy('last_name')" class="sortable">
+            Apellido {{ getSortIcon('last_name') }}
+          </th>
+          <th (click)="sortBy('email')" class="sortable">
+            Email {{ getSortIcon('email') }}
+          </th>
+          <th (click)="sortBy('date_of_birth')" class="sortable">
+            Fecha de Nacimiento {{ getSortIcon('date_of_birth') }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let user of paginatedUsers">
+          <td>{{ user.first_name }}</td>
+          <td>{{ user.last_name }}</td>
+          <td>{{ user.email }}</td>
+          <td>{{ user.date_of_birth }}</td>
+        </tr>
+        <tr *ngIf="paginatedUsers.length === 0">
+          <td colspan="4" class="no-data">No hay usuarios para mostrar</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Paginación -->
+    <div class="pagination" *ngIf="totalPages > 1">
+      <button 
+        (click)="previousPage()" 
+        [disabled]="currentPage === 1"
+        class="page-btn"
+        title="Página anterior">
+        ← Anterior
+      </button>
+
+      <button 
+        *ngFor="let page of getVisiblePages()"
+        (click)="goToPage(page)"
+        [class.active]="page === currentPage"
+        class="page-btn page-number">
+        {{ page }}
+      </button>
+
+      <button 
+        (click)="nextPage()" 
+        [disabled]="currentPage === totalPages"
+        class="page-btn"
+        title="Página siguiente">
+        Siguiente →
+      </button>
+    </div>
+  </div>
+</div>
