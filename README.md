@@ -1,104 +1,75 @@
-# PWA Angular - API Cache Demo
+# PWA de consulta con Angular
 
-Aplicación Progressive Web App (PWA) construida con Angular que demuestra diferentes estrategias de caché para APIs.
+Aplicación web progresiva pequeña que consume una API de Mockachino. Basada en el repositorio de la cátedra [pwa-angular](https://github.com/fabiancontigliani/pwa-angular); el README original quedó en [docs/README-base.md](docs/README-base.md) y el enunciado en [docs/enunciado.md](docs/enunciado.md).
 
-## Características
+## Decisiones de diseño
 
-- ✅ Progressive Web App (PWA)
-- ✅ Service Worker con estrategias de caché configurables
-- ✅ Cuatro componentes con diferentes estrategias:
-  - **Users**: Sin caché (siempre desde red)
-  - **Users Table**: Tabla paginada y ordenable (sin caché)
-  - **Persons**: Caché freshness (network-first)
-  - **Contacts**: Caché performance (cache-first)
-- ✅ Hash routing para compatibilidad con servidores estáticos
-- ✅ Componentes standalone de Angular 18
-- ✅ Tabla con ordenamiento por columnas (click en encabezado)
-- ✅ Paginación configurable (5, 10, 20, 50 registros por página)
+### 1. Alternativa elegida y alcance
+
+_Pendiente._
+
+### 2. Campos de cada elemento
+
+_Pendiente._
+
+### 3. Endpoint y estructura JSON
+
+_Pendiente._ El JSON cargado en Mockachino se guarda en [docs/mock/](docs/mock/).
+
+### 4. Información disponible sin conexión
+
+_Pendiente._
+
+### 5. Sin datos, falla de la API y primera carga
+
+_Pendiente._
+
+### 6. Cambios locales
+
+_Pendiente._
 
 ## Requisitos
 
-- Node.js 18 o superior
-- npm 9 o superior
+_Pendiente: versiones de Node y npm usadas._
 
-## Instalación
+## Instalación y ejecución local
 
 ```bash
-npm install
+npm ci
 ```
 
-## Desarrollo
-
-Servidor de desarrollo con hot reload:
+Desarrollo (sin service worker):
 
 ```bash
 npm start
 ```
 
-Navega a `http://localhost:4200`. La aplicación se recargará automáticamente si cambias algún archivo.
-
-## Producción
-
-### Build
-
-```bash
-npm run build
-```
-
-Los archivos de producción se generarán en `dist/pwa-api-cache/browser/`.
-
-### Servir PWA localmente
+Compilación de producción servida como PWA en `http://localhost:8080`:
 
 ```bash
 npm run serve:pwa
 ```
 
-Esto compila y sirve la aplicación en modo producción con http-server en `http://localhost:8080`.
+> El `package-lock.json` del repositorio base no coincidía con su `package.json` y `npm ci` fallaba. Se regeneró con `npm install` sin cambiar las versiones de Angular (18.2.14).
 
-## Estructura del Proyecto
+## Caché del service worker
 
-```
-src/
-├── app/
-│   ├── users/              # Componente sin caché
-│   ├── users-table/        # Tabla paginada y ordenable
-│   ├── persons/            # Componente con caché freshness
-│   ├── contacts/           # Componente con caché performance
-│   ├── api.service.ts      # Servicio para llamadas API
-│   ├── app.config.ts       # Configuración de la aplicación
-│   └── app.routes.ts       # Definición de rutas
-├── index.html
-├── main.ts
-└── styles.css
-ngsw-config.json            # Configuración del Service Worker
-```
+### assetGroups
 
-## Estrategias de Caché
+_Pendiente._
 
-### Sin Caché (Users)
-- Siempre obtiene datos frescos de la red
-- No configura service worker para este endpoint
+### dataGroups y estrategia elegida
 
-### Freshness (Persons)
-- Prioriza datos frescos (network-first)
-- Timeout de 5 segundos
-- Cache fallback si la red falla o tarda
-- Máximo 1 día de antigüedad
+_Pendiente._
 
-### Performance (Contacts)
-- Prioriza velocidad (cache-first)
-- Respuesta instantánea desde caché
-- Actualiza en segundo plano
-- Máximo 7 días de antigüedad
+## Instalación de la PWA y prueba sin conexión
 
-## Tecnologías
+_Pendiente: pasos para reproducir._
 
-- Angular 18
-- TypeScript
-- RxJS
-- Angular Service Worker
-- http-server
+## Limitaciones
 
-## Licencia
+_Pendiente: primera carga online, vigencia del caché._
 
-MIT
+## Evidencias
+
+_Pendiente._ Las capturas van en [docs/evidencias/](docs/evidencias/).
