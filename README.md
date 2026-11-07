@@ -202,7 +202,9 @@ Chromium ofrece instalar la aplicación con el nombre "Lista de tareas" y el ico
 
 ![Diálogo de instalación](docs/evidencias/2-instalar.png)
 
-_Pendiente: captura de la aplicación instalada abierta en su propia ventana._
+Una vez instalada, la aplicación se abre en una ventana propia, sin barra de direcciones ni pestañas, con el título "Lista de tareas" y el icono del tilde.
+
+![Aplicación instalada](docs/evidencias/2-instalada.png)
 
 ### Recarga sin conexión
 
