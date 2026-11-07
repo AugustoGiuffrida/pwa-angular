@@ -1,38 +1,159 @@
-/* You can add global styles to this file, and also import other style files */
-body {
-  font-family: Arial, sans-serif;
-  margin: 20px;
-  padding: 0;
-  background-color: #f5f5f5;
+:root {
+  --primary: #00695c;
+  --primary-dark: #004d40;
+  --text: #212121;
+  --muted: #616161;
+  --surface: #ffffff;
+  --background: #f1f5f4;
+  --error-bg: #fdecea;
+  --error-text: #b3261e;
+  --notice-bg: #fff4e5;
+  --notice-text: #8a4b00;
 }
 
-h1, h2 {
-  color: #333;
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, Arial, sans-serif;
+  color: var(--text);
+  background-color: var(--background);
+}
+
+.app-header {
+  padding: 16px;
+  color: #ffffff;
+  background-color: var(--primary);
+}
+
+.app-header h1 {
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 1.5rem;
+}
+
+.app-main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
 }
 
 button {
-  padding: 10px 20px;
-  background-color: #3f51b5;
-  color: white;
-  border: none;
+  padding: 8px 16px;
+  font: inherit;
+  color: #ffffff;
+  background-color: var(--primary);
+  border: 1px solid var(--primary);
   border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
 }
 
-button:hover {
-  background-color: #303f9f;
+button:hover:not(:disabled) {
+  background-color: var(--primary-dark);
 }
 
-ul {
-  list-style-type: none;
-  padding: 0;
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
-li {
-  padding: 8px;
-  margin: 4px 0;
-  background-color: white;
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.filters {
+  display: flex;
+  gap: 4px;
+}
+
+.filter {
+  color: var(--primary);
+  background-color: var(--surface);
+}
+
+.filter:hover:not(:disabled) {
+  color: #ffffff;
+}
+
+.filter.active {
+  color: #ffffff;
+  background-color: var(--primary);
+}
+
+.notice,
+.error {
+  padding: 12px;
   border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.notice {
+  color: var(--notice-text);
+  background-color: var(--notice-bg);
+}
+
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--error-text);
+  background-color: var(--error-bg);
+}
+
+.status,
+.empty {
+  color: var(--muted);
+}
+
+.tasks {
+  padding: 0;
+  list-style: none;
+}
+
+.tasks li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  margin: 6px 0;
+  background-color: var(--surface);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: #ffffff;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+}
+
+.done .check {
+  background-color: var(--primary);
+}
+
+.done .title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
