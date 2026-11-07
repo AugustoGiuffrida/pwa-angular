@@ -141,12 +141,48 @@ Se elige `freshness` porque prioriza mostrar los datos más recientes cuando hay
 
 ## Instalación de la PWA y prueba sin conexión
 
-_Pendiente: pasos para reproducir._
+Usar Chrome o Edge de escritorio, con la compilación de producción (`npm run serve:pwa`) abierta en `http://localhost:8080`. En modo desarrollo (`npm start`) el service worker no se registra.
+
+### 1. Primera carga con conexión
+
+1. Abrir `http://localhost:8080` y comprobar que aparecen las tareas.
+2. Abrir DevTools → **Application** → **Service Workers** y esperar a que `ngsw-worker.js` figure como *activated and is running*. Mantener desactivado **Bypass for network**.
+3. **Recargar la página.** La primera consulta ocurre antes de que el service worker controle la página, así que esa respuesta no queda guardada.
+4. En **Cache Storage** comprobar que existen las entradas `ngsw:/:<hash>:assets:app:cache` (interfaz) y `ngsw:/:1:data:tasks-api:cache` (respuesta de la API).
+
+### 2. Manifest e instalación
+
+1. En **Application** → **Manifest** comprobar el nombre "Lista de tareas", el nombre corto "Tareas", los iconos y la URL de inicio, sin errores.
+2. Instalar desde el icono de instalación de la barra de direcciones (o menú ⋮ → **Instalar Lista de tareas**).
+3. Abrir la app instalada y comprobar que se abre en una ventana propia, con el nombre y el icono del tilde.
+
+### 3. Recarga sin conexión
+
+1. En DevTools → **Network** activar **Offline**.
+2. Recargar normalmente, sin borrar datos ni anular el service worker.
+3. Comprobar que se muestran la interfaz, el aviso de sin conexión y las tareas guardadas.
+4. Probar los filtros y pulsar **Actualizar**: las tareas siguen apareciendo porque el service worker responde con la copia guardada.
+5. Desactivar **Offline** y pulsar **Actualizar** para volver a obtener los datos de la red.
+
+### 4. Primera carga de datos sin conexión
+
+Para ver el mensaje "Se necesita conexión para la primera carga de datos.":
+
+1. En **Application** → **Storage**, pulsar **Clear site data**.
+2. Abrir `http://localhost:8080` con conexión **una sola vez, sin recargar**, y esperar a que el service worker figure como activo. La interfaz queda guardada y la respuesta de la API no.
+3. Activar **Offline** y recargar.
+
+Después de esta prueba, repetir el paso 1 para volver a guardar los datos.
+
+### Reiniciar desde cero
+
+En **Application** → **Storage**, **Clear site data** borra el service worker y todos los cachés. Después hay que volver a hacer la primera carga con conexión.
 
 ## Limitaciones
 
 - **Hace falta una primera carga con conexión.** Si la aplicación nunca se abrió con conexión, no se puede abrir sin conexión. Si se guardó la interfaz pero no la respuesta de la API, se muestra el aviso de primera carga.
 - **Los datos tienen que cargarse con el service worker ya activo.** La primera consulta puede ocurrir antes de que el service worker controle la página; en ese caso hay que recargar o pulsar Actualizar.
+- **El service worker tiene que terminar de guardar la interfaz.** Si se pierde la conexión mientras todavía descarga los archivos, queda en modo degradado y no puede abrir la aplicación sin conexión hasta que vuelva a tener red.
 - **El caché vence a los 7 días** y se pierde si se borran los datos del sitio o el navegador libera espacio.
 - **La aplicación no distingue entre datos de la red y datos del caché.**
 
