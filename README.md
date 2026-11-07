@@ -24,28 +24,33 @@ Las pantallas de ejemplo del repositorio base (usuarios, tabla de usuarios, pers
 | `title` | texto | Sí | Descripción de la tarea, no vacía |
 | `completed` | booleano | Sí | `true` si la tarea está terminada |
 
-Los tres campos son obligatorios. Si la respuesta no es una lista, o algún elemento no tiene estos campos con su tipo, la aplicación lo muestra como **error de formato**: no lo convierte en una lista vacía ni descarta elementos sin avisar.
+Los tres campos son obligatorios. Si la respuesta no tiene la forma del punto 3, o algún elemento no tiene estos campos con su tipo, la aplicación lo muestra como **error de formato**: no lo convierte en una lista vacía ni descarta elementos sin avisar.
 
 ### 3. Endpoint y estructura JSON
 
 ```text
-GET https://www.mockachino.com/<espacio>/tasks
+GET https://www.mockachino.com/13417dd4-d40d-4e/tasks
 ```
-
-_Pendiente: reemplazar `<espacio>` por el identificador real cuando se cree el mock._
 
 - Estado `200` y `Content-Type: application/json`.
-- El cuerpo es **una lista directa** de tareas, no un objeto que la contenga:
+- CORS habilitado (`Access-Control-Allow-Origin: *`), así que el navegador puede leer la respuesta desde `localhost`.
+- El cuerpo es **un objeto con la propiedad `tasks`**, que contiene la lista de tareas:
 
 ```json
-[
-  { "id": 1, "title": "Revisar el repositorio base", "completed": true },
-  { "id": 2, "title": "Crear el endpoint en Mockachino", "completed": true },
-  { "id": 3, "title": "Conectar la API", "completed": false }
-]
+{
+  "tasks": [
+    { "id": 1, "title": "Revisar el repositorio base", "completed": true },
+    { "id": 2, "title": "Crear el endpoint en Mockachino", "completed": true },
+    { "id": 3, "title": "Conectar la API", "completed": false }
+  ]
+}
 ```
 
+No se usa una lista directa porque Mockachino solo acepta un objeto JSON como cuerpo de respuesta: al intentar guardar una lista responde `422` con `"value is not a valid dict"`. El servicio espera exactamente esta forma: lee `tasks` y, si falta o no es una lista, informa un error de formato.
+
 La respuesta completa cargada en Mockachino está en [docs/mock/tasks.json](docs/mock/tasks.json). La misma URL se usa en el servicio Angular y en `dataGroups` de `ngsw-config.json`.
+
+Para editar los datos del mock: <https://www.mockachino.com/spaces/13417dd4-d40d-4e>. Mockachino no tiene cuentas: este enlace se deduce de la URL de lectura, así que cualquiera que la conozca puede editar el mock.
 
 ### 4. Información disponible sin conexión
 
