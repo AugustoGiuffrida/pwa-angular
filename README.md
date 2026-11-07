@@ -188,4 +188,24 @@ En **Application** → **Storage**, **Clear site data** borra el service worker 
 
 ## Evidencias
 
-_Pendiente._ Las capturas van en [docs/evidencias/](docs/evidencias/).
+Capturas tomadas en Chromium sobre la compilación de producción (`npm run serve:pwa`).
+
+### Lista cargada con el service worker activo
+
+La lista coincide con el JSON del mock y `ngsw-worker.js` figura como *activated and is running* y controla `http://localhost:8080/#/`.
+
+![Lista cargada](docs/evidencias/1-lista.png)
+
+### Instalación
+
+Chromium ofrece instalar la aplicación con el nombre "Lista de tareas" y el icono del manifest.
+
+![Diálogo de instalación](docs/evidencias/2-instalar.png)
+
+_Pendiente: captura de la aplicación instalada abierta en su propia ventana._
+
+### Recarga sin conexión
+
+Con **Offline** activo en DevTools y después de recargar, se muestran la interfaz, el aviso de sin conexión y las tareas. En Network todo sale del service worker (0 B transferidos). La consulta a `tasks` falla en la red y el service worker responde con la copia guardada, como indica la estrategia `freshness`.
+
+![Recarga sin conexión](docs/evidencias/3-offline.png)
