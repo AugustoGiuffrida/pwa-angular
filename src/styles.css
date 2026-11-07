@@ -23,7 +23,7 @@ body {
 }
 
 .app-header {
-  padding: 16px;
+  padding: 16px 0;
   color: #ffffff;
   background-color: var(--primary);
 }
@@ -31,6 +31,7 @@ body {
 .app-header h1 {
   max-width: 640px;
   margin: 0 auto;
+  padding: 0 16px;
   font-size: 1.5rem;
 }
 
@@ -69,10 +70,12 @@ button:disabled {
 
 .filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
 .filter {
+  padding: 8px 12px;
   color: var(--primary);
   background-color: var(--surface);
 }
