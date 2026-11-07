@@ -2,69 +2,38 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { Task } from './task';
+
+// La respuesta no tiene la forma { "tasks": [...] } documentada en el README
+export class InvalidResponseError extends Error {}
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  
-  // URL base de tu mock
-  private baseUrl = 'https://www.mockachino.com/e76d4e5b-ccbc-40';
 
-  constructor(private http: HttpClient) { }
+  // Debe coincidir con la URL del grupo "tasks-api" en ngsw-config.json
+  private readonly tasksUrl = 'https://www.mockachino.com/13417dd4-d40d-4e/tasks';
 
-  getUsers(): Observable<any[]> {
-    return this.http.get<any>(`${this.baseUrl}/users`).pipe(
-      map(response => {
-        // Si la respuesta es un objeto con una propiedad que contiene el array
-        if (response && typeof response === 'object' && !Array.isArray(response)) {
-          // Intenta encontrar el array en las propiedades del objeto
-          const keys = Object.keys(response);
-          for (const key of keys) {
-            if (Array.isArray(response[key])) {
-              return response[key];
-            }
-          }
-          // Si no hay array, devuelve un array vacío
-          return [];
-        }
-        // Si ya es un array, devuélvelo directamente
-        return Array.isArray(response) ? response : [];
-      })
-    );
+  constructor(private readonly http: HttpClient) { }
+
+  getTasks(): Observable<Task[]> {
+    return this.http.get<unknown>(this.tasksUrl).pipe(map(parseTasks));
   }
+}
 
-  getPersons(): Observable<any[]> {
-    return this.http.get<any>(`${this.baseUrl}/persons`).pipe(
-      map(response => {
-        if (response && typeof response === 'object' && !Array.isArray(response)) {
-          const keys = Object.keys(response);
-          for (const key of keys) {
-            if (Array.isArray(response[key])) {
-              return response[key];
-            }
-          }
-          return [];
-        }
-        return Array.isArray(response) ? response : [];
-      })
-    );
+function parseTasks(body: unknown): Task[] {
+  const tasks = (body as { tasks?: unknown } | null)?.tasks;
+  if (!Array.isArray(tasks) || !tasks.every(isTask)) {
+    throw new InvalidResponseError('La API devolvió datos con un formato inesperado.');
   }
+  return tasks;
+}
 
-  getContacts(): Observable<any[]> {
-    return this.http.get<any>(`${this.baseUrl}/contacts`).pipe(
-      map(response => {
-        if (response && typeof response === 'object' && !Array.isArray(response)) {
-          const keys = Object.keys(response);
-          for (const key of keys) {
-            if (Array.isArray(response[key])) {
-              return response[key];
-            }
-          }
-          return [];
-        }
-        return Array.isArray(response) ? response : [];
-      })
-    );
-  }
+function isTask(value: unknown): value is Task {
+  const task = value as Partial<Task> | null;
+  return typeof task?.id === 'number'
+    && typeof task.title === 'string'
+    && task.title.trim() !== ''
+    && typeof task.completed === 'boolean';
 }

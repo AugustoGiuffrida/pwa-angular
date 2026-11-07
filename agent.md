@@ -136,30 +136,27 @@ export class FeatureComponent implements OnInit {
 
 3. **Manejo de Respuestas de API**
    - Usar `pipe` y `map` para transformar datos
-   - Extraer arrays de objetos anidados
-   - Retornar arrays vacíos como fallback
-
-### Patrón de Servicio API
+   - Validar la forma de la respuesta contra el contrato documentado en el README
+ ### Patrón de Servicio API
 
 ```typescript
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  private baseUrl = 'API_URL';
+  private readonly tasksUrl = 'API_URL/tasks';
 
-  constructor(private http: HttpClient) { }
+  constructor(private readonly http: HttpClient) { }
 
-  getData(): Observable<any[]> {
-    return this.http.get<any>(`${this.baseUrl}/endpoint`).pipe(
-      map(response => {
-        // Manejar objetos que contienen arrays
-        if (response && typeof response === 'object' && !Array.isArray(response)) {
-          const keys = Object.keys(response);
-          for (const key of keys) {
-            if (Array.isArray(response[key])) {
-              return response[key];
-            }
+  getTasks(): Observable<Task[]> {
+    return this.http.get<unknown>(this.tasksUrl).pipe(map(parseTasks));
+  }
+}
+
+// parseTasks valida { "tasks": [...] } y lanza InvalidResponseError si no coincide
+```
+
+    }
           }
           return [];
         }
@@ -203,7 +200,7 @@ export class ApiService {
    ```typescript
    provideRouter(routes, withHashLocation())
    ```
-   - URLs: `/#/users`, `/#/persons`, `/#/contacts`
+   - URL de la pantalla inicial: `/#/`
    - Necesario para servir con http-server
 
 2. **Definición de Rutas**
