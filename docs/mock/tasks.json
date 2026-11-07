@@ -1,0 +1,7 @@
+[
+  { "id": 1, "title": "Revisar el repositorio base", "completed": true },
+  { "id": 2, "title": "Crear el endpoint en Mockachino", "completed": true },
+  { "id": 3, "title": "Conectar la API", "completed": false },
+  { "id": 4, "title": "Configurar el manifest y los iconos", "completed": false },
+  { "id": 5, "title": "Probar la recarga sin conexión", "completed": false }
+]
