@@ -86,8 +86,14 @@ Lo único que se guarda en el navegador es el caché del service worker (Cache S
 
 ## Requisitos
 
-- Node.js **22.x** y npm. _Pendiente: anotar las versiones exactas usadas._
+- Node.js **22.x** y npm. Versiones usadas: Node **22.23.4** y npm **10.9.9**.
 - Chrome o Edge de escritorio para instalar la aplicación y probarla sin conexión.
+
+Con [nvm](https://github.com/nvm-sh/nvm), el archivo `.nvmrc` selecciona la versión de Node:
+
+```bash
+nvm use
+```
 
 ## Instalación y ejecución local
 
