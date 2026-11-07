@@ -7,7 +7,6 @@
       "installMode": "prefetch",
       "resources": {
         "files": [
-          "/favicon.ico",
           "/index.html",
           "/manifest.webmanifest",
           "/*.css",
@@ -17,7 +16,7 @@
     },
     {
       "name": "assets",
-      "installMode": "lazy",
+      "installMode": "prefetch",
       "updateMode": "prefetch",
       "resources": {
         "files": [
@@ -29,26 +28,15 @@
   ],
   "dataGroups": [
     {
-      "name": "api-persons-freshness",
+      "name": "tasks-api",
       "urls": [
-        "https://www.mockachino.com/e76d4e5b-ccbc-40/persons"
+        "https://www.mockachino.com/13417dd4-d40d-4e/tasks"
       ],
       "cacheConfig": {
+        "strategy": "freshness",
         "maxSize": 10,
-        "maxAge": "1d",
-        "timeout": "5s",
-        "strategy": "freshness"
-      }
-    },
-    {
-      "name": "api-contacts-performance",
-      "urls": [
-        "https://www.mockachino.com/e76d4e5b-ccbc-40/contacts"
-      ],
-      "cacheConfig": {
-        "maxSize": 10,
-        "maxAge": "2m",
-        "strategy": "performance"
+        "maxAge": "7d",
+        "timeout": "5s"
       }
     }
   ]
