@@ -48,7 +48,7 @@ GET https://www.mockachino.com/13417dd4-d40d-4e/tasks
 
 No se usa una lista directa porque Mockachino solo acepta un objeto JSON como cuerpo de respuesta: al intentar guardar una lista responde `422` con `"value is not a valid dict"`. El servicio espera exactamente esta forma: lee `tasks` y, si falta o no es una lista, informa un error de formato.
 
-La respuesta completa cargada en Mockachino está en [docs/mock/tasks.json](docs/mock/tasks.json). La misma URL se usa en el servicio Angular y en `dataGroups` de `ngsw-config.json`.
+La respuesta completa cargada en Mockachino está en [docs/mock/tasks.json](docs/mock/tasks.json). La misma URL se usa en el servicio Angular y en `runtimeCaching` de `workbox-config.js`.
 
 Para editar los datos del mock: <https://www.mockachino.com/spaces/13417dd4-d40d-4e>. Mockachino no tiene cuentas: este enlace se deduce de la URL de lectura, así que cualquiera que la conozca puede editar el mock.
 
@@ -69,7 +69,7 @@ Sin conexión, el botón Actualizar sigue haciendo la petición y el service wor
 | El filtro no deja ninguna tarea | "No hay tareas pendientes." o "No hay tareas completadas." |
 | La API falla y no había tareas en pantalla | Mensaje de error y botón **Reintentar** |
 | La API falla y ya había tareas en pantalla | Se conservan las tareas y se muestra el error |
-| Sin conexión y sin datos guardados (el service worker responde `504`) | "Se necesita conexión para la primera carga de datos." |
+| Sin conexión y sin datos guardados (la petición falla en la red y en el caché) | "Se necesita conexión para la primera carga de datos." |
 | La respuesta no cumple el formato del punto 2 | Error de formato |
 
 Además:
@@ -115,29 +115,38 @@ npm run serve:pwa
 
 > El `package-lock.json` del repositorio base no coincidía con su `package.json` y `npm ci` fallaba. Se regeneró con `npm install` sin cambiar las versiones de Angular (18.2.14).
 
-## Caché del service worker
+## Caché del service worker (Workbox)
 
-El service worker de Angular (`ngsw-worker.js`) se configura en `ngsw-config.json` con dos tipos de grupos.
+El service worker se genera con [Workbox](https://developer.chrome.com/docs/workbox) en lugar del service worker de Angular (`@angular/service-worker`), que se quitó del proyecto.
 
-### assetGroups
+### Cómo se genera y se registra
 
-Guardan los archivos necesarios para **abrir la aplicación**:
+1. `npm run build` ejecuta `ng build` y después `workbox generateSW workbox-config.js`.
+2. Workbox lee [workbox-config.js](workbox-config.js), recorre la carpeta compilada y escribe `sw.js` (más un archivo `workbox-<hash>.js` con la librería) en `dist/pwa-api-cache/browser/`.
+3. [src/main.ts](src/main.ts) registra `sw.js` con `navigator.serviceWorker.register('sw.js')`, solo en producción (`!isDevMode()`).
 
-- `app`: `index.html`, JavaScript, CSS y manifest. Se descargan al instalar el service worker (`prefetch`).
-- `assets`: iconos y demás recursos de `public/assets/`. Se cambia de `lazy` a `prefetch` para que estén disponibles desde la primera instalación.
+Con `skipWaiting` y `clientsClaim`, el service worker toma el control de la página apenas se activa, sin esperar a que se cierren las pestañas.
 
-### dataGroups y estrategia elegida
+### Precaché: la interfaz
 
-Guardan **respuestas de la API**. Hay un solo grupo, `tasks-api`, para el endpoint de tareas:
+`globPatterns` indica qué archivos se guardan **al instalar** el service worker para poder **abrir la aplicación** sin conexión: `index.html`, JavaScript, CSS, manifest e iconos (`assets/**/*.png`). Quedan en el caché `workbox-precache-v2-...`.
+
+Workbox guarda cada archivo con una revisión; al compilar una versión nueva, solo vuelve a descargar los que cambiaron.
+
+### Caché en tiempo de ejecución: la API
+
+`runtimeCaching` define qué hacer con las peticiones a la API. Hay una sola regla, para el endpoint de tareas:
 
 | Opción | Valor | Significado |
 | --- | --- | --- |
-| `strategy` | `freshness` | Primero intenta la red; si falla, usa la copia guardada |
-| `timeout` | `5s` | Si la red tarda más de 5 segundos, usa la copia guardada |
-| `maxAge` | `7d` | Una copia con más de 7 días deja de usarse |
-| `maxSize` | `10` | Máximo de respuestas guardadas (no de tareas dentro de la lista) |
+| `handler` | `NetworkFirst` | Primero intenta la red; si falla, usa la copia guardada |
+| `cacheName` | `tasks-api` | Nombre del caché en Cache Storage |
+| `networkTimeoutSeconds` | `5` | Si la red tarda más de 5 segundos, usa la copia guardada |
+| `expiration.maxAgeSeconds` | 7 días | Una copia con más de 7 días deja de usarse |
+| `expiration.maxEntries` | `10` | Máximo de respuestas guardadas (no de tareas dentro de la lista) |
+| `cacheableResponse.statuses` | `[200]` | Solo se guardan respuestas correctas |
 
-Se elige `freshness` porque prioriza mostrar los datos más recientes cuando hay conexión y recurre al caché solo cuando la red no responde.
+Se elige `NetworkFirst` porque prioriza mostrar los datos más recientes cuando hay conexión y recurre al caché solo cuando la red no responde. Las otras estrategias de Workbox son `CacheFirst` (primero el caché), `StaleWhileRevalidate` (responde con el caché y lo actualiza en segundo plano), `NetworkOnly` y `CacheOnly`.
 
 ## Instalación de la PWA y prueba sin conexión
 
@@ -146,9 +155,9 @@ Usar Chrome o Edge de escritorio, con la compilación de producción (`npm run s
 ### 1. Primera carga con conexión
 
 1. Abrir `http://localhost:8080` y comprobar que aparecen las tareas.
-2. Abrir DevTools → **Application** → **Service Workers** y esperar a que `ngsw-worker.js` figure como *activated and is running*. Mantener desactivado **Bypass for network**.
-3. **Recargar la página.** La primera consulta ocurre antes de que el service worker controle la página, así que esa respuesta no queda guardada.
-4. En **Cache Storage** comprobar que existen las entradas `ngsw:/:<hash>:assets:app:cache` (interfaz) y `ngsw:/:1:data:tasks-api:cache` (respuesta de la API).
+2. Abrir DevTools → **Application** → **Service Workers** y esperar a que `sw.js` figure como *activated and is running*. Mantener desactivado **Bypass for network**.
+3. **Pulsar Actualizar o recargar la página.** La primera consulta ocurre antes de que el service worker controle la página, así que esa respuesta no queda guardada.
+4. En **Cache Storage** comprobar que existen los cachés `workbox-precache-v2-http://localhost:8080/` (interfaz) y `tasks-api` (respuesta de la API).
 
 ### 2. Manifest e instalación
 
@@ -182,7 +191,7 @@ En **Application** → **Storage**, **Clear site data** borra el service worker 
 
 - **Hace falta una primera carga con conexión.** Si la aplicación nunca se abrió con conexión, no se puede abrir sin conexión. Si se guardó la interfaz pero no la respuesta de la API, se muestra el aviso de primera carga.
 - **Los datos tienen que cargarse con el service worker ya activo.** La primera consulta puede ocurrir antes de que el service worker controle la página; en ese caso hay que recargar o pulsar Actualizar.
-- **El service worker tiene que terminar de guardar la interfaz.** Si se pierde la conexión mientras todavía descarga los archivos, queda en modo degradado y no puede abrir la aplicación sin conexión hasta que vuelva a tener red.
+- **El service worker tiene que terminar de guardar la interfaz.** Si se pierde la conexión mientras todavía descarga los archivos, la instalación falla y se vuelve a intentar en la próxima visita con conexión.
 - **El caché vence a los 7 días** y se pierde si se borran los datos del sitio o el navegador libera espacio.
 - **La aplicación no distingue entre datos de la red y datos del caché.**
 
@@ -192,7 +201,7 @@ Capturas tomadas en Chromium sobre la compilación de producción (`npm run serv
 
 ### Lista cargada con el service worker activo
 
-La lista coincide con el JSON del mock y `ngsw-worker.js` figura como *activated and is running* y controla `http://localhost:8080/#/`.
+La lista coincide con el JSON del mock y `sw.js` figura como *activated and is running* y controla `http://localhost:8080/#/`.
 
 ![Lista cargada](docs/evidencias/1-lista.png)
 
@@ -208,6 +217,6 @@ Una vez instalada, la aplicación se abre en una ventana propia, sin barra de di
 
 ### Recarga sin conexión
 
-Con **Offline** activo en DevTools y después de recargar, se muestran la interfaz, el aviso de sin conexión y las tareas. En Network todo sale del service worker (0 B transferidos). La consulta a `tasks` falla en la red y el service worker responde con la copia guardada, como indica la estrategia `freshness`.
+Con **Offline** activo en DevTools y después de recargar, se muestran la interfaz, el aviso de sin conexión y las tareas. En Network todo sale del service worker (0 B transferidos). La consulta a `tasks` falla en la red y el service worker responde con la copia guardada, como indica la estrategia `NetworkFirst`.
 
 ![Recarga sin conexión](docs/evidencias/3-offline.png)

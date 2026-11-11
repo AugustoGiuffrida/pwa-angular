@@ -216,56 +216,18 @@ export class ApiService {
    <a routerLink="/feature">Link</a>
    ```
 
-## 🔧 Service Worker & PWA
+## 🔧 Service Worker & PWA (Workbox)
 
-### Configuración de Caché (ngsw-config.json)
+El service worker se genera con **Workbox** (`workbox-cli`), no con `@angular/service-worker`.
 
-#### Asset Groups
-- **app**: prefetch (archivos core)
-- **assets**: lazy load (imágenes, fuentes)
-
-#### Data Groups - Estrategias
-
-1. **Sin Caché** (no configurar en ngsw-config.json)
-   - Siempre desde red
-   - Para datos que cambian frecuentemente
-
-2. **Freshness Strategy** (network-first)
-   ```json
-   {
-     "strategy": "freshness",
-     "timeout": "5s",
-     "maxAge": "1d",
-     "maxSize": 10
-   }
-   ```
-   - Prioriza red
-   - Fallback a caché si red falla/timeout
-   - Para datos semi-dinámicos
-
-3. **Performance Strategy** (cache-first)
-   ```json
-   {
-     "strategy": "performance",
-     "maxAge": "2m",
-     "maxSize": 10
-   }
-   ```
-   - Prioriza caché
-   - Actualiza en background
-   - Para datos estables
-
-### Service Worker Config
-
-```typescript
-provideServiceWorker('ngsw-worker.js', {
-  enabled: !isDevMode(),
-  registrationStrategy: 'registerWhenStable:30000'
-})
-```
-
-- Solo habilitado en producción
-- Espera 30s de estabilidad antes de registrar
+- Configuración: `workbox-config.js` (modo `generateSW`)
+- `npm run build` = `ng build` + `workbox generateSW workbox-config.js` → `dist/pwa-api-cache/browser/sw.js`
+- Registro: `src/main.ts`, con `navigator.serviceWorker.register('sw.js')` solo si `!isDevMode()`
+- **Precaché** (`globPatterns`): HTML, JS, CSS, manifest e iconos
+- **Runtime caching** (`runtimeCaching`): una regla por endpoint de API
+  - `NetworkFirst` (red primero, caché como respaldo) → la que usa la API de tareas
+  - `CacheFirst` / `StaleWhileRevalidate` → caché primero, para datos estables
+- La URL de la regla debe coincidir con la del servicio Angular
 
 ## 📦 Build & Deployment
 
@@ -274,8 +236,8 @@ provideServiceWorker('ngsw-worker.js', {
 ```json
 {
   "start": "ng serve",              // Dev server (http://localhost:4200)
-  "build": "ng build",              // Production build
-  "serve:pwa": "ng build && http-server -p 8080 -c-1 dist/pwa-api-cache/browser"
+  "build": "ng build && workbox generateSW workbox-config.js", // Production build + service worker
+  "serve:pwa": "npm run build && http-server -p 8080 -c-1 dist/pwa-api-cache/browser"
 }
 ```
 
@@ -297,10 +259,6 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes, withHashLocation()),
     provideHttpClient(),
-    provideServiceWorker('ngsw-worker.js', {
-      enabled: !isDevMode(),
-      registrationStrategy: 'registerWhenStable:30000'
-    })
   ]
 };
 ```
@@ -309,7 +267,7 @@ export const appConfig: ApplicationConfig = {
 
 1. `provideRouter` con `withHashLocation()`
 2. `provideHttpClient()` para llamadas HTTP
-3. `provideServiceWorker()` para PWA
+3. El service worker de Workbox se registra en `src/main.ts`, no como provider
 
 ## 🎨 Estilos
 
