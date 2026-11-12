@@ -12,7 +12,7 @@ export class InvalidResponseError extends Error {}
 })
 export class ApiService {
 
-  // Debe coincidir con la URL del grupo "tasks-api" en ngsw-config.json
+  // Debe coincidir con la URL de la regla "tasks-api" en workbox-config.js
   private readonly tasksUrl = 'https://www.mockachino.com/13417dd4-d40d-4e/tasks';
 
   constructor(private readonly http: HttpClient) { }

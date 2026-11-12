@@ -80,8 +80,8 @@ export class TasksComponent implements OnInit {
     if (!(err instanceof HttpErrorResponse)) {
       return 'Ocurrió un error inesperado al obtener las tareas.';
     }
-    // 0: el navegador no llegó a la API; 504: el service worker no tiene red ni copia guardada
-    const unreachable = err.status === 0 || err.status === 504;
+    // 0: no se obtuvo respuesta, ni de la red ni del caché de Workbox
+    const unreachable = err.status === 0;
     if (unreachable && this.tasks === null && !navigator.onLine) {
       return 'Se necesita conexión para la primera carga de datos.';
     }
