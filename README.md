@@ -114,6 +114,12 @@ Se necesitan dos terminales: una para la API y otra para la aplicación.
 ### API (`http://localhost:8000`)
 
 ```bash
+api/start.sh
+```
+
+El script crea `api/.venv` si falta, instala las dependencias solo cuando cambia `requirements.txt` y arranca uvicorn. Se puede ejecutar desde cualquier carpeta; `PORT=8001 api/start.sh` cambia el puerto y los argumentos extra pasan a uvicorn (por ejemplo `api/start.sh --reload`). Equivale a:
+
+```bash
 cd api
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
