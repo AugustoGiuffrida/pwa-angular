@@ -41,13 +41,31 @@
     </div>
 
     <div class="status__item">
-      <dt>Última sincronización</dt>
+      <dt>Sincronización</dt>
       <dd class="status__value">
         {{ store.syncing ? 'Sincronizando…' : store.lastSyncAt ? (store.lastSyncAt | date: 'HH:mm:ss') : 'Nunca' }}
       </dd>
       <dd class="status__hint">Al abrir, al volver la conexión y después de cada cambio.</dd>
     </div>
   </dl>
+
+  <div class="notify" *ngIf="notifications.available" [ngSwitch]="notifications.permission">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0" />
+    </svg>
+    <ng-container *ngSwitchCase="'granted'">
+      <p>Avisos del sistema activados: te avisamos cuando los cambios llegan a la API.</p>
+    </ng-container>
+    <ng-container *ngSwitchCase="'denied'">
+      <p>Los avisos están bloqueados. Podés habilitarlos desde los permisos del sitio en el navegador.</p>
+    </ng-container>
+    <ng-container *ngSwitchDefault>
+      <p>Recibí un aviso del sistema cuando los cambios lleguen a la API (con la app abierta).</p>
+      <button type="button" class="notify__action" (click)="notifications.enable()" [disabled]="notifications.requesting">
+        Activar avisos
+      </button>
+    </ng-container>
+  </div>
 </section>
 
 <section class="panel">

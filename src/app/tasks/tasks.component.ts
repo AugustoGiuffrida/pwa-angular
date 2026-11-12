@@ -1,6 +1,7 @@
 import { Component, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { NotificationsService } from '../notifications.service';
 import { TasksStoreService } from '../tasks-store.service';
 import { Task } from '../task';
 
@@ -26,7 +27,10 @@ export class TasksComponent implements OnInit {
   editingId: string | null = null;
   editTitle = '';
 
-  constructor(readonly store: TasksStoreService) {}
+  constructor(
+    readonly store: TasksStoreService,
+    readonly notifications: NotificationsService,
+  ) {}
 
   ngOnInit() {
     this.store.sync();

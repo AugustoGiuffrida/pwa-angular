@@ -260,6 +260,40 @@ button:focus-visible {
   color: var(--notice-text);
 }
 
+.notify {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 12px 20px;
+  font-size: 0.875rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+.notify p {
+  flex: 1 1 240px;
+}
+
+.notify .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.notify__action {
+  padding: 6px 12px;
+  font-weight: 600;
+  color: var(--primary);
+  background-color: var(--primary-soft);
+  border: 0;
+  border-radius: 8px;
+}
+
+.notify__action:hover:not(:disabled) {
+  color: var(--on-primary);
+  background-color: var(--primary);
+}
+
 .progress {
   grid-column: 1 / -1;
   height: 8px;

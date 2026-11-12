@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { ApiService, InvalidResponseError, isTask } from './api.service';
+import { NotificationsService } from './notifications.service';
 import { Task } from './task';
 
 // Cambio local que la API todavía no confirmó: guardar la versión local de la tarea o borrarla
@@ -31,7 +32,10 @@ export class TasksStoreService {
 
   private syncAgain = false;
 
-  constructor(private readonly apiService: ApiService) {
+  constructor(
+    private readonly apiService: ApiService,
+    private readonly notifications: NotificationsService,
+  ) {
     this.load();
     window.addEventListener('online', () => this.sync());
   }
@@ -69,12 +73,20 @@ export class TasksStoreService {
     this.syncing = true;
     this.syncError = null;
     try {
+      let sent = 0;
       for (const [id, change] of Object.entries(this.pending)) {
-        await this.send(id, change);
+        if (await this.send(id, change)) {
+          sent++;
+        }
       }
       const serverTasks = await firstValueFrom(this.apiService.getTasks());
       this.tasks = this.withPendingApplied(serverTasks);
       this.lastSyncAt = new Date();
+      if (sent > 0) {
+        this.notifications.notify(sent === 1
+          ? 'Se envió 1 cambio a la API.'
+          : `Se enviaron ${sent} cambios a la API.`);
+      }
     } catch (err) {
       // Red o servidor: los cambios quedan pendientes y se reintentan en la próxima sincronización.
       // Sin conexión y con datos en pantalla no es un error: el estado de conexión ya lo indica.
@@ -90,13 +102,17 @@ export class TasksStoreService {
     }
   }
 
-  private async send(id: string, change: PendingChange) {
+  // Devuelve true si la API aceptó el cambio
+  private async send(id: string, change: PendingChange): Promise<boolean> {
     const task = this.tasks?.find(item => item.id === id);
+    let accepted = false;
     try {
       if (change === 'delete') {
         await firstValueFrom(this.apiService.deleteTask(id));
+        accepted = true;
       } else if (task) {
         await firstValueFrom(this.apiService.putTask(task));
+        accepted = true;
       }
     } catch (err) {
       if (!isRejection(err)) {
@@ -111,6 +127,7 @@ export class TasksStoreService {
       const { [id]: _sent, ...rest } = this.pending;
       this.pending = rest;
     }
+    return accepted;
   }
 
   // La lista del servidor, con los cambios que todavía no se enviaron aplicados encima
