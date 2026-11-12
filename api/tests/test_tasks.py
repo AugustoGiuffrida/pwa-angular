@@ -109,7 +109,10 @@ def test_uuid_is_normalized(client):
     assert client.get("/api/tasks").json()["tasks"][0]["id"] == TASK_ID
 
 
-@pytest.mark.parametrize("origin", ["http://localhost:4200", "http://localhost:8080"])
+@pytest.mark.parametrize(
+    "origin",
+    ["http://localhost:4200", "http://localhost:8080", "http://127.0.0.1:4200", "http://127.0.0.1:8080"],
+)
 @pytest.mark.parametrize("method", ["PUT", "DELETE"])
 def test_cors_preflight(client, origin, method):
     response = client.options(

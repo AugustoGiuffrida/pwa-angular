@@ -53,7 +53,7 @@ El cuerpo de `PUT` lleva solo `title` y `completed`; el `id` va en la URL.
 
 **Por qué `PUT` y no `POST` para crear.** Los cambios hechos sin conexión se envían más tarde y pueden reintentarse: si la red se corta después de que la API guardó, pero antes de que llegue la respuesta, la aplicación vuelve a enviar el mismo cambio. Con `PUT` sobre el UUID que generó la aplicación, el reintento cae sobre la misma tarea y no la duplica. Con `POST`, cada reintento crearía otra tarea. Por la misma razón, `DELETE` responde `204` aunque la tarea ya no exista.
 
-Las respuestas llevan `Cache-Control: no-store`, para que el navegador no las guarde en su caché HTTP, y CORS permite `http://localhost:4200` y `http://localhost:8080`.
+Las respuestas llevan `Cache-Control: no-store`, para que el navegador no las guarde en su caché HTTP, y CORS permite la aplicación en `localhost` o `127.0.0.1`, puertos `4200` y `8080`.
 
 ### 4. Información disponible sin conexión
 
@@ -122,7 +122,7 @@ python3 -m venv .venv
 
 La documentación interactiva queda en <http://localhost:8000/docs>. **Ctrl+C** detiene la API; las tareas se conservan en `api/data/tasks.db`.
 
-Variables opcionales: `DATABASE_PATH` (por defecto `./data/tasks.db`) y `CORS_ORIGINS` (por defecto `http://localhost:4200,http://localhost:8080`).
+Variables opcionales: `DATABASE_PATH` (por defecto `./data/tasks.db`) y `CORS_ORIGINS` (por defecto `localhost` y `127.0.0.1` en los puertos `4200` y `8080`; para el navegador son orígenes distintos).
 
 Pruebas de la API:
 

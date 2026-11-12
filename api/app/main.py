@@ -39,9 +39,13 @@ class TaskList(BaseModel):
 
 def create_app() -> FastAPI:
     database_path = Path(os.getenv("DATABASE_PATH", "./data/tasks.db"))
+    # localhost y 127.0.0.1 son orígenes distintos para el navegador: se permiten los dos
+    default_origins = ",".join(
+        f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for port in (4200, 8080)
+    )
     origins = [
         origin.strip()
-        for origin in os.getenv("CORS_ORIGINS", "http://localhost:4200,http://localhost:8080").split(",")
+        for origin in os.getenv("CORS_ORIGINS", default_origins).split(",")
         if origin.strip()
     ]
 
