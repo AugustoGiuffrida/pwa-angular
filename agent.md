@@ -9,7 +9,8 @@ Este documento define las reglas, convenciones y patrones de desarrollo para est
 - **Arquitectura**: PWA (Progressive Web App) con Service Worker
 - **Estrategia de Routing**: Hash Location (`/#/route`)
 - **Patrón de Componentes**: Standalone Components
-- **Estado**: RxJS Observables con async pipe
+- **Estado**: `TasksStoreService` con propiedades simples, persistidas en `localStorage`
+- **API**: FastAPI + SQLite en la carpeta `api/`
 
 ## 🏗️ Arquitectura del Proyecto
 
@@ -32,6 +33,9 @@ public/
 ├── assets/                     # Assets estáticos
 │   └── icons/                  # Iconos PWA
 └── manifest.webmanifest        # PWA manifest
+api/
+├── app/main.py                 # API de tareas (FastAPI + SQLite)
+└── tests/                      # Pruebas con pytest
 ```
 
 ## 🎯 Reglas de TypeScript
@@ -130,42 +134,42 @@ export class FeatureComponent implements OnInit {
    })
    ```
 
-2. **Retornar Observables**
-   - Nunca Promises
-   - Tipar como `Observable<T[]>` o `Observable<T>`
+2. **Responsabilidades**
+   - `ApiService`: solo HTTP. Devuelve Observables tipados y valida la forma de cada respuesta
+   - `TasksStoreService`: tareas, cambios pendientes y sincronización. Usa `firstValueFrom` y `async/await`
+   - `NotificationsService`: avisos del sistema mediante el service worker
 
 3. **Manejo de Respuestas de API**
    - Usar `pipe` y `map` para transformar datos
    - Validar la forma de la respuesta contra el contrato documentado en el README
- ### Patrón de Servicio API
+   - Si la respuesta no cumple el contrato, lanzar un error: nunca devolver un array vacío como fallback, porque oculta el problema
+
+### Patrón de Servicio API
 
 ```typescript
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  private readonly tasksUrl = 'API_URL/tasks';
+  private readonly tasksUrl = 'http://localhost:8000/api/tasks';
 
   constructor(private readonly http: HttpClient) { }
 
   getTasks(): Observable<Task[]> {
-    return this.http.get<unknown>(this.tasksUrl).pipe(map(parseTasks));
+    return this.http.get<unknown>(this.tasksUrl).pipe(timeout(TIMEOUT_MS), map(parseTasks));
   }
 }
 
 // parseTasks valida { "tasks": [...] } y lanza InvalidResponseError si no coincide
 ```
 
-    }
-          }
-          return [];
-        }
-        return Array.isArray(response) ? response : [];
-      })
-    );
-  }
-}
-```
+### Datos offline y sincronización
+
+- Cada cambio se aplica primero en pantalla y en `localStorage` (clave `lista-de-tareas.v1`)
+- Una marca pendiente por tarea: `'save'` (PUT con la última versión) o `'delete'` (DELETE)
+- `PUT /api/tasks/{uuid}` crea o reemplaza y `DELETE` es idempotente: reintentar no duplica nada
+- Sincronizar = enviar los pendientes y después `GET` de la lista completa, con los pendientes aplicados encima
+- Errores 4xx (salvo 408 y 429): se descarta el cambio y se avisa. Red o 5xx: el cambio queda pendiente
 
 ## 🎨 Templates HTML
 
@@ -224,10 +228,7 @@ El service worker se genera con **Workbox** (`workbox-cli`), no con `@angular/se
 - `npm run build` = `ng build` + `workbox generateSW workbox-config.js` → `dist/pwa-api-cache/browser/sw.js`
 - Registro: `src/main.ts`, con `navigator.serviceWorker.register('sw.js')` solo si `!isDevMode()`
 - **Precaché** (`globPatterns`): HTML, JS, CSS, manifest e iconos
-- **Runtime caching** (`runtimeCaching`): una regla por endpoint de API
-  - `NetworkFirst` (red primero, caché como respaldo) → la que usa la API de tareas
-  - `CacheFirst` / `StaleWhileRevalidate` → caché primero, para datos estables
-- La URL de la regla debe coincidir con la del servicio Angular
+- **Sin `runtimeCaching` para la API**: los datos offline viven en `localStorage`; una copia en Cache Storage podría quedar vieja y pisar la lista local
 
 ## 📦 Build & Deployment
 

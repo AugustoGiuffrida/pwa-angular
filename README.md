@@ -1,6 +1,10 @@
-# PWA de consulta con Angular
+# Lista de tareas: PWA con Angular y API propia
 
-Aplicación web progresiva pequeña que consume una API de Mockachino. Basada en el repositorio de la cátedra [pwa-angular](https://github.com/fabiancontigliani/pwa-angular); el README original quedó en [docs/README-base.md](docs/README-base.md) y el enunciado en [docs/enunciado.md](docs/enunciado.md).
+Aplicación web progresiva para gestionar tareas que **funciona sin conexión**: los cambios se guardan en el dispositivo y se envían a una API propia (FastAPI + SQLite) cuando vuelve la red.
+
+Basada en el repositorio de la cátedra [pwa-angular](https://github.com/fabiancontigliani/pwa-angular); el README original quedó en [docs/README-base.md](docs/README-base.md) y el enunciado en [docs/enunciado.md](docs/enunciado.md).
+
+> **Alcance respecto del enunciado.** El enunciado pide como mínimo una aplicación de **consulta** y aclara que no hacen falta un backend propio, un CRUD completo ni la sincronización de cambios offline. Esta entrega los agrega como extensión. La versión de consulta, que leía la lista de Mockachino y la guardaba con el caché del service worker, quedó en la etiqueta [`v1-consulta`](../../tree/v1-consulta).
 
 ## Decisiones de diseño
 
@@ -8,103 +12,130 @@ Aplicación web progresiva pequeña que consume una API de Mockachino. Basada en
 
 **Lista de tareas.** La aplicación permite:
 
-- Ver las tareas que devuelve la API.
-- Filtrarlas en el navegador: **Todas**, **Pendientes** o **Completadas**.
-- Pulsar **Actualizar** para volver a consultar la API.
+- Ver las tareas y filtrarlas en el navegador: **Todas**, **Pendientes** o **Completadas**.
+- **Crear** tareas, **marcarlas** como completadas o pendientes, **editar** el título y **borrarlas**.
+- Hacer todo eso **sin conexión**: los cambios quedan en el dispositivo y se envían a la API al sincronizar.
+- Ver el estado: conexión, cambios sin enviar y hora de la última sincronización.
+- Recibir, si se activa, un **aviso del sistema** cuando los cambios llegan a la API.
 
-Es una aplicación **solo de consulta**: no crea, edita ni marca tareas. Para cambiar los datos se edita la respuesta configurada en Mockachino.
-
-Las pantallas de ejemplo del repositorio base (usuarios, tabla de usuarios, personas y contactos) se eliminan, y la lista de tareas pasa a ser la pantalla inicial.
+Fuera del alcance: usuarios y autenticación, resolver conflictos entre varios dispositivos (gana la última escritura que recibe la API) y sincronizar con la aplicación cerrada (Background Sync o push).
 
 ### 2. Campos de cada elemento
 
 | Campo | Tipo | Obligatorio | Descripción |
 | --- | --- | --- | --- |
-| `id` | número | Sí | Identificador único de la tarea |
-| `title` | texto | Sí | Descripción de la tarea, no vacía |
+| `id` | texto (UUID) | Sí | Lo genera la aplicación con `crypto.randomUUID()`, para poder crear tareas sin conexión |
+| `title` | texto | Sí | No puede quedar vacío; se quitan los espacios de los extremos |
 | `completed` | booleano | Sí | `true` si la tarea está terminada |
 
-Los tres campos son obligatorios. Si la respuesta no tiene la forma del punto 3, o algún elemento no tiene estos campos con su tipo, la aplicación lo muestra como **error de formato**: no lo convierte en una lista vacía ni descarta elementos sin avisar.
+La aplicación valida cada tarea que recibe de la API y de `localStorage`. La API rechaza con `422` un título vacío, un `completed` que no sea booleano, campos de más o un `id` que no sea un UUID.
 
-### 3. Endpoint y estructura JSON
+### 3. API y estructura JSON
 
-```text
-GET https://www.mockachino.com/13417dd4-d40d-4e/tasks
-```
+La API está en la carpeta [api/](api/) y se sirve en `http://localhost:8000`:
 
-- Estado `200` y `Content-Type: application/json`.
-- CORS habilitado (`Access-Control-Allow-Origin: *`), así que el navegador puede leer la respuesta desde `localhost`.
-- El cuerpo es **un objeto con la propiedad `tasks`**, que contiene la lista de tareas:
+| Método y ruta | Respuesta |
+| --- | --- |
+| `GET /api/tasks` | `200` con `{"tasks": [...]}`, en orden de creación; lista vacía si no hay tareas |
+| `GET /api/tasks/{id}` | `200` con la tarea, o `404` |
+| `PUT /api/tasks/{id}` | Crea (`201`) o reemplaza (`200`) la tarea; devuelve la tarea completa |
+| `DELETE /api/tasks/{id}` | `204`, exista o no la tarea |
 
 ```json
 {
   "tasks": [
-    { "id": 1, "title": "Revisar el repositorio base", "completed": true },
-    { "id": 2, "title": "Crear el endpoint en Mockachino", "completed": true },
-    { "id": 3, "title": "Conectar la API", "completed": false }
+    { "id": "4e2590d7-4ab5-4aef-8e13-ff063cf82c3c", "title": "Conectar la API", "completed": false }
   ]
 }
 ```
 
-No se usa una lista directa porque Mockachino solo acepta un objeto JSON como cuerpo de respuesta: al intentar guardar una lista responde `422` con `"value is not a valid dict"`. El servicio espera exactamente esta forma: lee `tasks` y, si falta o no es una lista, informa un error de formato.
+El cuerpo de `PUT` lleva solo `title` y `completed`; el `id` va en la URL.
 
-La respuesta completa cargada en Mockachino está en [docs/mock/tasks.json](docs/mock/tasks.json). La misma URL se usa en el servicio Angular y en `runtimeCaching` de `workbox-config.js`.
+**Por qué `PUT` y no `POST` para crear.** Los cambios hechos sin conexión se envían más tarde y pueden reintentarse: si la red se corta después de que la API guardó, pero antes de que llegue la respuesta, la aplicación vuelve a enviar el mismo cambio. Con `PUT` sobre el UUID que generó la aplicación, el reintento cae sobre la misma tarea y no la duplica. Con `POST`, cada reintento crearía otra tarea. Por la misma razón, `DELETE` responde `204` aunque la tarea ya no exista.
 
-Para editar los datos del mock: <https://www.mockachino.com/spaces/13417dd4-d40d-4e>. Mockachino no tiene cuentas: este enlace se deduce de la URL de lectura, así que cualquiera que la conozca puede editar el mock.
+Las respuestas llevan `Cache-Control: no-store`, para que el navegador no las guarde en su caché HTTP, y CORS permite `http://localhost:4200` y `http://localhost:8080`.
 
 ### 4. Información disponible sin conexión
 
 - **La interfaz completa:** HTML, JavaScript, CSS, manifest e iconos, guardados por el service worker al instalarse.
-- **La última lista de tareas obtenida mientras el service worker controlaba la página**, durante un máximo de 7 días.
-- **El filtro**, porque se aplica en el navegador sobre la lista ya cargada.
+- **Las tareas y los cambios sin enviar**, guardados en `localStorage`.
+- **Todas las acciones:** filtrar, crear, marcar, editar y borrar. Los cambios se marcan como **Sin enviar** y el contador de la tarjeta de estado los suma.
 
-Sin conexión, el botón Actualizar sigue haciendo la petición y el service worker responde con la copia guardada.
+Al volver la conexión, la aplicación sincroniza sola.
 
 ### 5. Sin datos, falla de la API y primera carga
 
 | Situación | Qué muestra la aplicación |
 | --- | --- |
-| Petición en curso | Indicador de carga; el botón Actualizar queda deshabilitado |
+| Sincronización en curso | "Sincronizando…" y el botón **Sincronizar** deshabilitado; barras de carga si todavía no hay tareas |
 | La API devuelve una lista vacía | "No hay tareas." |
 | El filtro no deja ninguna tarea | "No hay tareas pendientes." o "No hay tareas completadas." |
-| La API falla y no había tareas en pantalla | Mensaje de error y botón **Reintentar** |
-| La API falla y ya había tareas en pantalla | Se conservan las tareas y se muestra el error |
-| Sin conexión y sin datos guardados (la petición falla en la red y en el caché) | "Se necesita conexión para la primera carga de datos." |
-| La respuesta no cumple el formato del punto 2 | Error de formato |
+| Nunca se obtuvo la lista y la API no responde | "Se necesita conexión con la API para la primera carga de datos." y **Reintentar** |
+| Sin conexión, con tareas en el dispositivo | Las tareas guardadas, sin mensaje de error: la tarjeta de estado indica "Sin conexión" |
+| La API no responde y hay cambios sin enviar | "No se pudo conectar con la API. Los cambios quedan guardados en este dispositivo." y **Reintentar** |
+| La API rechaza un cambio (`4xx`) | Se descarta ese cambio, queda la versión del servidor y se avisa qué tarea fue |
+| La respuesta no tiene el formato del punto 3 | Error de formato; no se reemplaza la lista |
+| La copia de `localStorage` está dañada | Se descarta, se avisa y la lista se vuelve a descargar de la API |
 
 Además:
 
-- Un **aviso de sin conexión** aparece según `navigator.onLine` y los eventos `online`/`offline`. Es solo orientativo: no impide la petición, porque el service worker puede responder desde su caché.
-- Tras una consulta exitosa se muestra **"Datos obtenidos a las HH:MM"** y no "actualizados del servidor", porque la aplicación no puede saber si la respuesta vino de la red o del caché.
-- Nunca se muestran datos de ejemplo escritos en el código en lugar de la respuesta de la API.
+- El estado de **Conexión** usa `navigator.onLine` y los eventos `online`/`offline`. Es orientativo: estar "En línea" no garantiza que la API responda.
+- Nunca se muestran datos de ejemplo escritos en el código en lugar de los de la API o del dispositivo.
 
 ### 6. Cambios locales
 
-**No hay cambios locales.** La aplicación no usa `localStorage` ni IndexedDB.
+Se guardan en `localStorage`, en la clave `lista-de-tareas.v1`:
 
-Lo único que se guarda en el navegador es el caché del service worker (Cache Storage). Para restablecerlo: DevTools → **Application** → **Storage** → **Clear site data**. Después hay que volver a abrir la aplicación con conexión para que guarde de nuevo la interfaz y los datos.
+```json
+{
+  "tasks": [{ "id": "…", "title": "…", "completed": false }],
+  "pending": { "<id>": "save", "<otro id>": "delete" },
+  "lastSyncAt": 1794060409920
+}
+```
+
+- Cada cambio se aplica primero en pantalla y en `localStorage`, y la tarea queda marcada como pendiente: `save` (enviar la versión local con `PUT`) o `delete` (enviar un `DELETE`).
+- Hay **una marca por tarea**, no una lista de operaciones: si una tarea se edita tres veces sin conexión, se envía un solo `PUT` con la última versión. Como `PUT` y `DELETE` se pueden repetir sin efectos de más, el orden entre tareas distintas no importa.
+- **Sincronizar** envía cada pendiente y después pide la lista completa con `GET`. Si mientras tanto se hizo otro cambio, se aplica encima de la lista del servidor y se envía en la vuelta siguiente.
+- Se sincroniza al abrir la aplicación, al volver la conexión, después de cada cambio con conexión y con el botón **Sincronizar**.
+
+Para **restablecer**: pulsar **Sincronizar** con la API disponible deja todo igual al servidor. **Clear site data** (DevTools → **Application** → **Storage**) borra `localStorage`, **incluidos los cambios sin enviar**. Para vaciar la API, detenerla y borrar `api/data/tasks.db`.
 
 ## Requisitos
 
-- Node.js **22.x** y npm. Versiones usadas: Node **22.23.4** y npm **10.9.9**.
+- Node.js **22.x** y npm. Versiones usadas: Node **22.23.4** y npm **10.9.9**. Con [nvm](https://github.com/nvm-sh/nvm), `nvm use` toma la versión de `.nvmrc`.
+- Python **3.11** o posterior para la API. Versión usada: **3.13.5**.
 - Chrome o Edge de escritorio para instalar la aplicación y probarla sin conexión.
-
-Con [nvm](https://github.com/nvm-sh/nvm), el archivo `.nvmrc` selecciona la versión de Node:
-
-```bash
-nvm use
-```
 
 ## Instalación y ejecución local
 
+Se necesitan dos terminales: una para la API y otra para la aplicación.
+
+### API (`http://localhost:8000`)
+
 ```bash
-npm ci
+cd api
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --port 8000
 ```
 
-Desarrollo (sin service worker):
+La documentación interactiva queda en <http://localhost:8000/docs>. **Ctrl+C** detiene la API; las tareas se conservan en `api/data/tasks.db`.
+
+Variables opcionales: `DATABASE_PATH` (por defecto `./data/tasks.db`) y `CORS_ORIGINS` (por defecto `http://localhost:4200,http://localhost:8080`).
+
+Pruebas de la API:
 
 ```bash
-npm start
+cd api
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pytest
+```
+
+### Aplicación
+
+```bash
+npm ci
 ```
 
 Compilación de producción servida como PWA en `http://localhost:8080`:
@@ -113,25 +144,30 @@ Compilación de producción servida como PWA en `http://localhost:8080`:
 npm run serve:pwa
 ```
 
+Desarrollo en `http://localhost:4200`, sin service worker ni avisos del sistema:
+
+```bash
+npm start
+```
+
 > El `package-lock.json` del repositorio base no coincidía con su `package.json` y `npm ci` fallaba. Se regeneró con `npm install` sin cambiar las versiones de Angular (18.2.14).
 
-## Caché del service worker (Workbox)
+## Service worker y datos sin conexión
 
 El service worker se genera con [Workbox](https://developer.chrome.com/docs/workbox) en lugar del service worker de Angular (`@angular/service-worker`), que se quitó del proyecto.
 
 ### Equivalencia con assetGroups y dataGroups
 
-El enunciado propone configurar el service worker de Angular en `ngsw-config.json`, que separa el caché en dos tipos de grupos. Workbox cubre las mismas dos responsabilidades con otras opciones:
+El enunciado propone configurar el service worker de Angular en `ngsw-config.json`, que separa el caché en dos tipos de grupos:
 
-| Responsabilidad | Service worker de Angular | Workbox (esta entrega) |
+| Responsabilidad | Service worker de Angular | Esta entrega |
 | --- | --- | --- |
-| Guardar los archivos para **abrir la aplicación** | `assetGroups` con `installMode: prefetch` | `globPatterns` (precaché) |
-| Guardar las **respuestas de la API** | `dataGroups` | `runtimeCaching` |
-| Estrategia para la API | `freshness`: red primero, caché si falla o tarda | `NetworkFirst`: red primero, caché si falla o tarda |
-| Espera antes de usar el caché | `timeout: "5s"` | `networkTimeoutSeconds: 5` |
-| Vigencia y cantidad de respuestas | `maxAge: "7d"`, `maxSize: 10` | `maxAgeSeconds: 7 días`, `maxEntries: 10` |
+| Guardar los archivos para **abrir la aplicación** | `assetGroups` con `installMode: prefetch` | Precaché de Workbox (`globPatterns`) |
+| Guardar los **datos** para consultarlos sin conexión | `dataGroups` (respuestas de la API en Cache Storage) | `localStorage`, desde la aplicación |
 
-El comportamiento para el usuario es el mismo: la interfaz se guarda al instalar el service worker y la lista de tareas se guarda la primera vez que se consulta con el service worker activo.
+**Por qué los datos no van en el caché del service worker.** Un caché de respuestas solo guarda lo que respondió el servidor: no puede guardar una tarea creada sin conexión que todavía no se envió. Además, si el service worker devolviera una respuesta vieja del caché cuando la aplicación pide la lista después de sincronizar, la aplicación la tomaría como la lista del servidor y podría hacer reaparecer tareas borradas. Por eso hay una sola copia local, en `localStorage`, y la API responde con `Cache-Control: no-store`.
+
+En la versión de consulta ([`v1-consulta`](../../tree/v1-consulta)), los datos sí se guardaban en el service worker, con `runtimeCaching` y la estrategia `NetworkFirst` (equivalente a `freshness`).
 
 ### Cómo se genera y se registra
 
@@ -143,35 +179,27 @@ Con `skipWaiting` y `clientsClaim`, el service worker toma el control de la pág
 
 ### Precaché: la interfaz
 
-`globPatterns` indica qué archivos se guardan **al instalar** el service worker para poder **abrir la aplicación** sin conexión: `index.html`, JavaScript, CSS, manifest e iconos (`assets/**/*.png`). Quedan en el caché `workbox-precache-v2-...`.
+`globPatterns` indica qué archivos se guardan **al instalar** el service worker: `index.html`, JavaScript, CSS, manifest e iconos (`assets/**/*.png`). Quedan en el caché `workbox-precache-v2-...`. Workbox guarda cada archivo con una revisión; al compilar una versión nueva, solo vuelve a descargar los que cambiaron.
 
-Workbox guarda cada archivo con una revisión; al compilar una versión nueva, solo vuelve a descargar los que cambiaron.
+### Avisos del sistema
 
-### Caché en tiempo de ejecución: la API
+Con el permiso concedido, al terminar una sincronización que envió cambios la aplicación le pide al service worker que muestre un aviso ("Se enviaron 2 cambios a la API.") con `registration.showNotification`. Son avisos locales, no notificaciones push: solo aparecen con la aplicación abierta.
 
-`runtimeCaching` define qué hacer con las peticiones a la API. Hay una sola regla, para el endpoint de tareas:
+- El permiso se pide únicamente con el botón **Activar avisos** de la tarjeta de estado, nunca al abrir la aplicación.
+- Si el permiso está bloqueado, la tarjeta explica cómo habilitarlo desde los permisos del sitio.
+- En desarrollo (`npm start`) no hay service worker y la opción no aparece.
 
-| Opción | Valor | Significado |
-| --- | --- | --- |
-| `handler` | `NetworkFirst` | Primero intenta la red; si falla, usa la copia guardada |
-| `cacheName` | `tasks-api` | Nombre del caché en Cache Storage |
-| `networkTimeoutSeconds` | `5` | Si la red tarda más de 5 segundos, usa la copia guardada |
-| `expiration.maxAgeSeconds` | 7 días | Una copia con más de 7 días deja de usarse |
-| `expiration.maxEntries` | `10` | Máximo de respuestas guardadas (no de tareas dentro de la lista) |
-| `cacheableResponse.statuses` | `[200]` | Solo se guardan respuestas correctas |
+## Instalación de la PWA y pruebas
 
-Se elige `NetworkFirst` porque prioriza mostrar los datos más recientes cuando hay conexión y recurre al caché solo cuando la red no responde. Las otras estrategias de Workbox son `CacheFirst` (primero el caché), `StaleWhileRevalidate` (responde con el caché y lo actualiza en segundo plano), `NetworkOnly` y `CacheOnly`.
-
-## Instalación de la PWA y prueba sin conexión
-
-Usar Chrome o Edge de escritorio, con la compilación de producción (`npm run serve:pwa`) abierta en `http://localhost:8080`. En modo desarrollo (`npm start`) el service worker no se registra.
+Usar Chrome o Edge de escritorio, con la API levantada y la compilación de producción (`npm run serve:pwa`) abierta en `http://localhost:8080`.
 
 ### 1. Primera carga con conexión
 
-1. Abrir `http://localhost:8080` y comprobar que aparecen las tareas.
-2. Abrir DevTools → **Application** → **Service Workers** y esperar a que `sw.js` figure como *activated and is running*. Mantener desactivado **Bypass for network**.
-3. **Pulsar Actualizar o recargar la página.** La primera consulta ocurre antes de que el service worker controle la página, así que esa respuesta no queda guardada.
-4. En **Cache Storage** comprobar que existen los cachés `workbox-precache-v2-http://localhost:8080/` (interfaz) y `tasks-api` (respuesta de la API).
+1. Abrir `http://localhost:8080`, crear algunas tareas y comprobar que "Cambios sin enviar" vuelve a `0`.
+2. En DevTools → **Application** → **Service Workers**, comprobar que `sw.js` figura como *activated and is running*.
+3. En **Cache Storage**, comprobar el caché `workbox-precache-v2-http://localhost:8080/` (interfaz).
+4. En **Local Storage** → `http://localhost:8080`, comprobar la clave `lista-de-tareas.v1` (tareas y pendientes).
+5. En <http://localhost:8000/docs> (o con `curl http://localhost:8000/api/tasks`), comprobar que las tareas llegaron a la API.
 
 ### 2. Manifest e instalación
 
@@ -179,58 +207,52 @@ Usar Chrome o Edge de escritorio, con la compilación de producción (`npm run s
 2. Instalar desde el icono de instalación de la barra de direcciones (o menú ⋮ → **Instalar Lista de tareas**).
 3. Abrir la app instalada y comprobar que se abre en una ventana propia, con el nombre y el icono del tilde.
 
-### 3. Recarga sin conexión
+### 3. Cambios sin conexión
 
 1. En DevTools → **Network** activar **Offline**.
-2. Recargar normalmente, sin borrar datos ni anular el service worker.
-3. Comprobar que se muestran la interfaz, el aviso de sin conexión y las tareas guardadas.
-4. Probar los filtros y pulsar **Actualizar**: las tareas siguen apareciendo porque el service worker responde con la copia guardada.
-5. Desactivar **Offline** y pulsar **Actualizar** para volver a obtener los datos de la red.
+2. Crear una tarea, marcar otra y borrar una tercera. Cada una queda con la etiqueta **Sin enviar** y el contador "Cambios sin enviar" sube.
+3. Recargar sin borrar datos: la interfaz, las tareas y los cambios pendientes siguen ahí.
+4. Comprobar en la API que todavía no llegaron.
+5. Desactivar **Offline**: la aplicación sincroniza sola, el contador vuelve a `0` y la API tiene los cambios.
 
-### 4. Primera carga de datos sin conexión
+### 4. API caída
 
-Para ver el mensaje "Se necesita conexión para la primera carga de datos.":
+1. Detener la API (**Ctrl+C**) y hacer un cambio: aparece "No se pudo conectar con la API. Los cambios quedan guardados en este dispositivo.".
+2. Volver a levantar la API y pulsar **Reintentar** o **Sincronizar**.
 
-1. En **Application** → **Storage**, pulsar **Clear site data**.
-2. Abrir `http://localhost:8080` con conexión **una sola vez, sin recargar**, y esperar a que el service worker figure como activo. La interfaz queda guardada y la respuesta de la API no.
-3. Activar **Offline** y recargar.
+### 5. Primera carga sin datos
 
-Después de esta prueba, repetir el paso 1 para volver a guardar los datos.
+1. Con la API detenida, en **Application** → **Storage** pulsar **Clear site data** y recargar.
+2. Aparece "Se necesita conexión con la API para la primera carga de datos.".
+
+### 6. Avisos del sistema
+
+1. Pulsar **Activar avisos** y aceptar el permiso.
+2. Hacer un cambio sin conexión y volver a conectarse: aparece el aviso "Se envió 1 cambio a la API.".
 
 ### Reiniciar desde cero
 
-En **Application** → **Storage**, **Clear site data** borra el service worker y todos los cachés. Después hay que volver a hacer la primera carga con conexión.
+**Clear site data** borra el service worker, el caché y `localStorage` (incluidos los cambios sin enviar). Después hay que volver a abrir la aplicación con conexión.
 
 ## Limitaciones
 
-- **Hace falta una primera carga con conexión.** Si la aplicación nunca se abrió con conexión, no se puede abrir sin conexión. Si se guardó la interfaz pero no la respuesta de la API, se muestra el aviso de primera carga.
-- **Los datos tienen que cargarse con el service worker ya activo.** La primera consulta puede ocurrir antes de que el service worker controle la página; en ese caso hay que recargar o pulsar Actualizar.
-- **El service worker tiene que terminar de guardar la interfaz.** Si se pierde la conexión mientras todavía descarga los archivos, la instalación falla y se vuelve a intentar en la próxima visita con conexión.
-- **El caché vence a los 7 días** y se pierde si se borran los datos del sitio o el navegador libera espacio.
-- **La aplicación no distingue entre datos de la red y datos del caché.**
+- **Hace falta una primera visita con conexión** para que el service worker guarde la interfaz, y la API tiene que responder al menos una vez para obtener la lista.
+- **El service worker tiene que terminar de guardar la interfaz.** Si se pierde la conexión mientras descarga los archivos, la instalación falla y se vuelve a intentar en la próxima visita con conexión.
+- **Solo sincroniza con la aplicación abierta.** Si la API vuelve a funcionar sin que cambie la conexión del navegador, hay que pulsar **Sincronizar**.
+- **`localStorage` no es un respaldo.** Borrar los datos del sitio elimina los cambios sin enviar, y el navegador limita su tamaño (unos 5 MB).
+- **Un cambio rechazado por la API se pierde** y hay que rehacerlo. La aplicación valida el título antes de guardarlo, así que no debería ocurrir en el uso normal.
+- **Una sola pestaña a la vez.** Dos pestañas abiertas comparten `localStorage` pero no se avisan entre sí, y la última que guarda pisa la copia de la otra.
+- **Sin resolución de conflictos** entre dispositivos: gana la última escritura que recibe la API.
+- **Los avisos del sistema** solo aparecen con la aplicación abierta, en la compilación de producción, y el modo "No molestar" del sistema puede ocultarlos.
 
 ## Evidencias
 
-Capturas tomadas en Chromium sobre la compilación de producción (`npm run serve:pwa`).
-
-### Lista cargada con el service worker activo
-
-La lista coincide con el JSON del mock y `sw.js` figura como *activated and is running* y controla `http://localhost:8080/#/`.
+> **Pendiente:** estas capturas son de la versión de consulta ([`v1-consulta`](../../tree/v1-consulta)), con la interfaz anterior. Falta repetirlas con esta versión: lista cargada, aplicación instalada, cambios sin conexión y sincronización al volver la conexión.
 
 ![Lista cargada](docs/evidencias/1-lista.png)
 
-### Instalación
-
-Chromium ofrece instalar la aplicación con el nombre "Lista de tareas" y el icono del manifest.
-
 ![Diálogo de instalación](docs/evidencias/2-instalar.png)
 
-Una vez instalada, la aplicación se abre en una ventana propia, sin barra de direcciones ni pestañas, con el título "Lista de tareas" y el icono del tilde.
-
 ![Aplicación instalada](docs/evidencias/2-instalada.png)
-
-### Recarga sin conexión
-
-Con **Offline** activo en DevTools y después de recargar, se muestran la interfaz, el aviso de sin conexión y las tareas. En Network todo sale del service worker (0 B transferidos). La consulta a `tasks` falla en la red y el service worker responde con la copia guardada, como indica la estrategia `NetworkFirst`.
 
 ![Recarga sin conexión](docs/evidencias/3-offline.png)
