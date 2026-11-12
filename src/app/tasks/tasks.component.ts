@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs/operators';
@@ -7,13 +7,16 @@ import { Task } from '../task';
 
 type Filter = 'all' | 'pending' | 'completed';
 
+// 'no-sw': ningún service worker controla la página (por ejemplo, con npm start)
+type OfflineCopy = 'saved' | 'missing' | 'no-sw';
+
 @Component({
   selector: 'app-tasks',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './tasks.component.html',
 })
-export class TasksComponent implements OnInit {
+export class TasksComponent implements OnInit, OnDestroy {
 
   readonly filters: { value: Filter; label: string }[] = [
     { value: 'all', label: 'Todas' },
@@ -28,11 +31,21 @@ export class TasksComponent implements OnInit {
   error: string | null = null;
   loadedAt: Date | null = null;
   online = navigator.onLine;
+  // null hasta la primera comprobación
+  offlineCopy: OfflineCopy | null = null;
+
+  private readonly onControllerChange = () => this.checkOfflineCopy();
 
   constructor(private readonly apiService: ApiService) {}
 
   ngOnInit() {
     this.loadTasks();
+    // Con clientsClaim, el service worker puede tomar el control después de la primera carga
+    navigator.serviceWorker?.addEventListener('controllerchange', this.onControllerChange);
+  }
+
+  ngOnDestroy() {
+    navigator.serviceWorker?.removeEventListener('controllerchange', this.onControllerChange);
   }
 
   // Solo orientativo: la petición se hace igual, el service worker puede responder desde su caché
@@ -76,7 +89,11 @@ export class TasksComponent implements OnInit {
     this.loading = true;
     this.error = null;
     this.apiService.getTasks()
-      .pipe(finalize(() => this.loading = false))
+      .pipe(finalize(() => {
+        this.loading = false;
+        // Workbox guarda la respuesta después de entregarla: se espera un momento antes de mirar el caché
+        setTimeout(() => this.checkOfflineCopy(), 500);
+      }))
       .subscribe({
         next: tasks => {
           this.tasks = tasks;
@@ -89,6 +106,15 @@ export class TasksComponent implements OnInit {
 
   trackById(_index: number, task: Task) {
     return task.id;
+  }
+
+  private checkOfflineCopy() {
+    if (!navigator.serviceWorker?.controller) {
+      this.offlineCopy = 'no-sw';
+      return;
+    }
+    this.apiService.hasOfflineCopy()
+      .then(saved => this.offlineCopy = saved ? 'saved' : 'missing');
   }
 
   private describeError(err: unknown): string {

@@ -20,6 +20,14 @@ export class ApiService {
   getTasks(): Observable<Task[]> {
     return this.http.get<unknown>(this.tasksUrl).pipe(map(parseTasks));
   }
+
+  // Indica si Workbox tiene guardada una respuesta de la API en el caché "tasks-api"
+  async hasOfflineCopy(): Promise<boolean> {
+    if (!('caches' in window)) {
+      return false;
+    }
+    return (await caches.match(this.tasksUrl, { cacheName: 'tasks-api' })) !== undefined;
+  }
 }
 
 function parseTasks(body: unknown): Task[] {

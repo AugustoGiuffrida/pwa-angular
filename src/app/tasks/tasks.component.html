@@ -1,25 +1,62 @@
-<div class="banner notice" *ngIf="!online" role="status">
-  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M2 8.8a15 15 0 0 1 20 0M5.5 12.4a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0M12 20h.01M3 3l18 18" />
-  </svg>
-  <p><strong>Sin conexión.</strong> Si las tareas se consultaron antes, se muestran las guardadas.</p>
-</div>
+<section class="overview" aria-label="Resumen">
+  <div class="overview__progress" *ngIf="tasks && tasks.length > 0">
+    <div class="overview__count">
+      <p class="overview__number">{{ completedCount }} de {{ tasks.length }}</p>
+      <p class="overview__label">tareas completadas</p>
+    </div>
+    <p class="overview__percent">{{ progress }} %</p>
+    <div
+      class="progress"
+      role="progressbar"
+      aria-label="Tareas completadas"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      [attr.aria-valuenow]="progress">
+      <span class="progress__bar" [style.width.%]="progress"></span>
+    </div>
+  </div>
 
-<section class="summary" *ngIf="tasks && tasks.length > 0" aria-label="Progreso">
-  <div class="summary__text">
-    <p class="summary__count">{{ completedCount }} de {{ tasks.length }}</p>
-    <p class="summary__label">tareas completadas</p>
-  </div>
-  <p class="summary__percent">{{ progress }} %</p>
-  <div
-    class="progress"
-    role="progressbar"
-    aria-label="Tareas completadas"
-    aria-valuemin="0"
-    aria-valuemax="100"
-    [attr.aria-valuenow]="progress">
-    <span class="progress__bar" [style.width.%]="progress"></span>
-  </div>
+  <dl class="status">
+    <div class="status__item" [class.status__item--offline]="!online" role="status">
+      <dt>Conexión</dt>
+      <dd class="status__value">
+        <span class="status__dot" aria-hidden="true"></span>
+        {{ online ? 'En línea' : 'Sin conexión' }}
+      </dd>
+      <dd class="status__hint">
+        {{ online
+          ? 'Según el navegador; no garantiza que la API responda.'
+          : 'Si las tareas se consultaron antes, se muestran las guardadas.' }}
+      </dd>
+    </div>
+
+    <div class="status__item">
+      <dt>Copia sin conexión</dt>
+      <ng-container [ngSwitch]="offlineCopy">
+        <ng-container *ngSwitchCase="'saved'">
+          <dd class="status__value">Guardada</dd>
+          <dd class="status__hint">La lista se puede ver sin conexión.</dd>
+        </ng-container>
+        <ng-container *ngSwitchCase="'missing'">
+          <dd class="status__value">Todavía no</dd>
+          <dd class="status__hint">Se guarda al consultar con el service worker activo.</dd>
+        </ng-container>
+        <ng-container *ngSwitchCase="'no-sw'">
+          <dd class="status__value">No disponible</dd>
+          <dd class="status__hint">Ningún service worker controla la página.</dd>
+        </ng-container>
+        <dd class="status__value" *ngSwitchDefault>Comprobando…</dd>
+      </ng-container>
+    </div>
+
+    <div class="status__item">
+      <dt>Última lista</dt>
+      <dd class="status__value">
+        {{ loading ? 'Consultando…' : loadedAt ? (loadedAt | date: 'HH:mm:ss') : 'Sin datos' }}
+      </dd>
+      <dd class="status__hint">Puede venir de la red o de la copia guardada.</dd>
+    </div>
+  </dl>
 </section>
 
 <section class="panel">
@@ -79,13 +116,4 @@
       </li>
     </ul>
   </ng-container>
-
-  <p class="panel__footer">
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
-    </svg>
-    <span *ngIf="loading">Cargando tareas…</span>
-    <span *ngIf="!loading && loadedAt">Datos obtenidos a las {{ loadedAt | date: 'HH:mm' }}.</span>
-    <span *ngIf="!loading && !loadedAt">Todavía no se obtuvieron datos.</span>
-  </p>
 </section>
