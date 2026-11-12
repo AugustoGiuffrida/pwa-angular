@@ -76,8 +76,10 @@ export class TasksStoreService {
       this.tasks = this.withPendingApplied(serverTasks);
       this.lastSyncAt = new Date();
     } catch (err) {
-      // Red o servidor: los cambios quedan pendientes y se reintentan en la próxima sincronización
-      this.syncError = this.describeError(err);
+      // Red o servidor: los cambios quedan pendientes y se reintentan en la próxima sincronización.
+      // Sin conexión y con datos en pantalla no es un error: el estado de conexión ya lo indica.
+      const expectedOffline = !navigator.onLine && this.tasks !== null && !(err instanceof InvalidResponseError);
+      this.syncError = expectedOffline ? null : this.describeError(err);
     } finally {
       this.syncing = false;
       this.save();
