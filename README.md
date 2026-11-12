@@ -119,6 +119,20 @@ npm run serve:pwa
 
 El service worker se genera con [Workbox](https://developer.chrome.com/docs/workbox) en lugar del service worker de Angular (`@angular/service-worker`), que se quitó del proyecto.
 
+### Equivalencia con assetGroups y dataGroups
+
+El enunciado propone configurar el service worker de Angular en `ngsw-config.json`, que separa el caché en dos tipos de grupos. Workbox cubre las mismas dos responsabilidades con otras opciones:
+
+| Responsabilidad | Service worker de Angular | Workbox (esta entrega) |
+| --- | --- | --- |
+| Guardar los archivos para **abrir la aplicación** | `assetGroups` con `installMode: prefetch` | `globPatterns` (precaché) |
+| Guardar las **respuestas de la API** | `dataGroups` | `runtimeCaching` |
+| Estrategia para la API | `freshness`: red primero, caché si falla o tarda | `NetworkFirst`: red primero, caché si falla o tarda |
+| Espera antes de usar el caché | `timeout: "5s"` | `networkTimeoutSeconds: 5` |
+| Vigencia y cantidad de respuestas | `maxAge: "7d"`, `maxSize: 10` | `maxAgeSeconds: 7 días`, `maxEntries: 10` |
+
+El comportamiento para el usuario es el mismo: la interfaz se guarda al instalar el service worker y la lista de tareas se guarda la primera vez que se consulta con el service worker activo.
+
 ### Cómo se genera y se registra
 
 1. `npm run build` ejecuta `ng build` y después `workbox generateSW workbox-config.js`.
