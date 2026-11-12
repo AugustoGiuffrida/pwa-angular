@@ -1,22 +1,18 @@
-import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
-import { finalize } from 'rxjs/operators';
-import { ApiService, InvalidResponseError } from '../api.service';
+import { FormsModule } from '@angular/forms';
+import { TasksStoreService } from '../tasks-store.service';
 import { Task } from '../task';
 
 type Filter = 'all' | 'pending' | 'completed';
 
-// 'no-sw': ningún service worker controla la página (por ejemplo, con npm start)
-type OfflineCopy = 'saved' | 'missing' | 'no-sw';
-
 @Component({
   selector: 'app-tasks',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './tasks.component.html',
 })
-export class TasksComponent implements OnInit, OnDestroy {
+export class TasksComponent implements OnInit {
 
   readonly filters: { value: Filter; label: string }[] = [
     { value: 'all', label: 'Todas' },
@@ -24,35 +20,27 @@ export class TasksComponent implements OnInit, OnDestroy {
     { value: 'completed', label: 'Completadas' },
   ];
 
-  // null mientras nunca se obtuvieron datos
-  tasks: Task[] | null = null;
   filter: Filter = 'all';
-  loading = false;
-  error: string | null = null;
-  loadedAt: Date | null = null;
   online = navigator.onLine;
-  // null hasta la primera comprobación
-  offlineCopy: OfflineCopy | null = null;
+  newTitle = '';
+  editingId: string | null = null;
+  editTitle = '';
 
-  private readonly onControllerChange = () => this.checkOfflineCopy();
-
-  constructor(private readonly apiService: ApiService) {}
+  constructor(readonly store: TasksStoreService) {}
 
   ngOnInit() {
-    this.loadTasks();
-    // Con clientsClaim, el service worker puede tomar el control después de la primera carga
-    navigator.serviceWorker?.addEventListener('controllerchange', this.onControllerChange);
+    this.store.sync();
   }
 
-  ngOnDestroy() {
-    navigator.serviceWorker?.removeEventListener('controllerchange', this.onControllerChange);
-  }
-
-  // Solo orientativo: la petición se hace igual, el service worker puede responder desde su caché
+  // Solo orientativo: la sincronización se intenta igual con el botón
   @HostListener('window:online')
   @HostListener('window:offline')
   updateOnline() {
     this.online = navigator.onLine;
+  }
+
+  get tasks(): Task[] | null {
+    return this.store.tasks;
   }
 
   get visibleTasks(): Task[] {
@@ -73,6 +61,49 @@ export class TasksComponent implements OnInit, OnDestroy {
     return this.tasksFor(filter).length;
   }
 
+  isPending(task: Task): boolean {
+    return task.id in this.store.pending;
+  }
+
+  addTask() {
+    if (this.newTitle.trim() === '') {
+      return;
+    }
+    this.store.add(this.newTitle);
+    this.newTitle = '';
+  }
+
+  toggle(task: Task) {
+    this.store.update(task.id, { completed: !task.completed });
+  }
+
+  startEdit(task: Task) {
+    this.editingId = task.id;
+    this.editTitle = task.title;
+  }
+
+  saveEdit(task: Task) {
+    const title = this.editTitle.trim();
+    if (title !== '' && title !== task.title) {
+      this.store.update(task.id, { title });
+    }
+    this.editingId = null;
+  }
+
+  cancelEdit() {
+    this.editingId = null;
+  }
+
+  remove(task: Task) {
+    if (window.confirm(`¿Borrar "${task.title}"?`)) {
+      this.store.remove(task.id);
+    }
+  }
+
+  trackById(_index: number, task: Task) {
+    return task.id;
+  }
+
   private tasksFor(filter: Filter): Task[] {
     const tasks = this.tasks ?? [];
     switch (filter) {
@@ -83,55 +114,5 @@ export class TasksComponent implements OnInit, OnDestroy {
       default:
         return tasks;
     }
-  }
-
-  loadTasks() {
-    this.loading = true;
-    this.error = null;
-    this.apiService.getTasks()
-      .pipe(finalize(() => {
-        this.loading = false;
-        // Workbox guarda la respuesta después de entregarla: se espera un momento antes de mirar el caché
-        setTimeout(() => this.checkOfflineCopy(), 500);
-      }))
-      .subscribe({
-        next: tasks => {
-          this.tasks = tasks;
-          this.loadedAt = new Date();
-        },
-        // Si ya había tareas en pantalla, se conservan
-        error: err => this.error = this.describeError(err),
-      });
-  }
-
-  trackById(_index: number, task: Task) {
-    return task.id;
-  }
-
-  private checkOfflineCopy() {
-    if (!navigator.serviceWorker?.controller) {
-      this.offlineCopy = 'no-sw';
-      return;
-    }
-    this.apiService.hasOfflineCopy()
-      .then(saved => this.offlineCopy = saved ? 'saved' : 'missing');
-  }
-
-  private describeError(err: unknown): string {
-    if (err instanceof InvalidResponseError) {
-      return err.message;
-    }
-    if (!(err instanceof HttpErrorResponse)) {
-      return 'Ocurrió un error inesperado al obtener las tareas.';
-    }
-    // 0: no se obtuvo respuesta, ni de la red ni del caché de Workbox
-    const unreachable = err.status === 0;
-    if (unreachable && this.tasks === null && !navigator.onLine) {
-      return 'Se necesita conexión para la primera carga de datos.';
-    }
-    if (unreachable) {
-      return 'No se pudo conectar con la API.';
-    }
-    return `La API respondió con un error (${err.status}).`;
   }
 }

@@ -26,35 +26,26 @@
       <dd class="status__hint">
         {{ online
           ? 'Según el navegador; no garantiza que la API responda.'
-          : 'Si las tareas se consultaron antes, se muestran las guardadas.' }}
+          : 'Podés seguir usando la lista: los cambios se guardan en este dispositivo.' }}
+      </dd>
+    </div>
+
+    <div class="status__item" [class.status__item--pending]="store.pendingCount > 0">
+      <dt>Cambios sin enviar</dt>
+      <dd class="status__value">{{ store.pendingCount }}</dd>
+      <dd class="status__hint">
+        {{ store.pendingCount > 0
+          ? 'Se envían a la API al sincronizar.'
+          : 'Todo lo que ves está guardado en la API.' }}
       </dd>
     </div>
 
     <div class="status__item">
-      <dt>Copia sin conexión</dt>
-      <ng-container [ngSwitch]="offlineCopy">
-        <ng-container *ngSwitchCase="'saved'">
-          <dd class="status__value">Guardada</dd>
-          <dd class="status__hint">La lista se puede ver sin conexión.</dd>
-        </ng-container>
-        <ng-container *ngSwitchCase="'missing'">
-          <dd class="status__value">Todavía no</dd>
-          <dd class="status__hint">Se guarda al consultar con el service worker activo.</dd>
-        </ng-container>
-        <ng-container *ngSwitchCase="'no-sw'">
-          <dd class="status__value">No disponible</dd>
-          <dd class="status__hint">Ningún service worker controla la página.</dd>
-        </ng-container>
-        <dd class="status__value" *ngSwitchDefault>Comprobando…</dd>
-      </ng-container>
-    </div>
-
-    <div class="status__item">
-      <dt>Última lista</dt>
+      <dt>Última sincronización</dt>
       <dd class="status__value">
-        {{ loading ? 'Consultando…' : loadedAt ? (loadedAt | date: 'HH:mm:ss') : 'Sin datos' }}
+        {{ store.syncing ? 'Sincronizando…' : store.lastSyncAt ? (store.lastSyncAt | date: 'HH:mm:ss') : 'Nunca' }}
       </dd>
-      <dd class="status__hint">Puede venir de la red o de la copia guardada.</dd>
+      <dd class="status__hint">Al abrir, al volver la conexión y después de cada cambio.</dd>
     </div>
   </dl>
 </section>
@@ -73,23 +64,54 @@
         <span class="filter__count" *ngIf="tasks">{{ countFor(option.value) }}</span>
       </button>
     </div>
-    <button type="button" class="refresh" [class.is-loading]="loading" (click)="loadTasks()" [disabled]="loading">
+    <button type="button" class="refresh" [class.is-loading]="store.syncing" (click)="store.sync()" [disabled]="store.syncing">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" />
       </svg>
-      Actualizar
+      Sincronizar
     </button>
   </div>
 
-  <div class="banner error" *ngIf="error" role="alert">
+  <form class="new-task" (ngSubmit)="addTask()">
+    <label class="visually-hidden" for="new-task-title">Nueva tarea</label>
+    <input
+      id="new-task-title"
+      name="title"
+      type="text"
+      placeholder="Nueva tarea…"
+      autocomplete="off"
+      maxlength="200"
+      [(ngModel)]="newTitle">
+    <button type="submit" class="add" [disabled]="newTitle.trim() === ''">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+      Agregar
+    </button>
+  </form>
+
+  <div class="banner error" *ngIf="store.syncError" role="alert">
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 8v5M12 16.5h.01M10.3 3.9L2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
     </svg>
-    <p>{{ error }}</p>
-    <button type="button" class="banner__action" (click)="loadTasks()" [disabled]="loading">Reintentar</button>
+    <p>{{ store.syncError }}</p>
+    <button type="button" class="banner__action" (click)="store.sync()" [disabled]="store.syncing">Reintentar</button>
   </div>
 
-  <ul class="skeleton" *ngIf="loading && !tasks" aria-hidden="true">
+  <div class="banner error" *ngIf="store.rejected.length > 0" role="alert">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 8v5M12 16.5h.01M10.3 3.9L2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    </svg>
+    <p><ng-container *ngFor="let message of store.rejected">{{ message }}<br></ng-container></p>
+    <button type="button" class="banner__action" (click)="store.dismissRejected()">Entendido</button>
+  </div>
+
+  <div class="banner error" *ngIf="store.storageError" role="alert">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 8v5M12 16.5h.01M10.3 3.9L2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    </svg>
+    <p>{{ store.storageError }}</p>
+  </div>
+
+  <ul class="skeleton" *ngIf="store.syncing && !tasks" aria-hidden="true">
     <li></li>
     <li></li>
     <li></li>
@@ -108,11 +130,38 @@
 
     <ul class="tasks">
       <li *ngFor="let task of visibleTasks; trackBy: trackById" class="task" [class.done]="task.completed">
-        <span class="task__check" aria-hidden="true">
-          <svg *ngIf="task.completed" viewBox="0 0 24 24"><path d="M6 12.5l4 4L18 8.5" /></svg>
-        </span>
-        <span class="task__title">{{ task.title }}</span>
-        <span class="task__badge">{{ task.completed ? 'Completada' : 'Pendiente' }}</span>
+        <button
+          type="button"
+          class="task__check"
+          [attr.aria-label]="task.completed ? 'Marcar «' + task.title + '» como pendiente' : 'Marcar «' + task.title + '» como completada'"
+          [attr.aria-pressed]="task.completed"
+          (click)="toggle(task)">
+          <svg *ngIf="task.completed" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4L18 8.5" /></svg>
+        </button>
+
+        <form *ngIf="editingId === task.id; else view" class="task__edit" (ngSubmit)="saveEdit(task)">
+          <label class="visually-hidden" [attr.for]="'edit-' + task.id">Título de la tarea</label>
+          <input
+            [id]="'edit-' + task.id"
+            name="title"
+            type="text"
+            maxlength="200"
+            [(ngModel)]="editTitle"
+            (keydown.escape)="cancelEdit()">
+          <button type="submit" class="task__save" [disabled]="editTitle.trim() === ''">Guardar</button>
+          <button type="button" class="task__cancel" (click)="cancelEdit()">Cancelar</button>
+        </form>
+
+        <ng-template #view>
+          <span class="task__title">{{ task.title }}</span>
+          <span class="task__sync" *ngIf="isPending(task)" title="Todavía no se envió a la API">Sin enviar</span>
+          <button type="button" class="task__action" [attr.aria-label]="'Editar «' + task.title + '»'" title="Editar" (click)="startEdit(task)">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" /></svg>
+          </button>
+          <button type="button" class="task__action task__action--danger" [attr.aria-label]="'Borrar «' + task.title + '»'" title="Borrar" (click)="remove(task)">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+          </button>
+        </ng-template>
       </li>
     </ul>
   </ng-container>
