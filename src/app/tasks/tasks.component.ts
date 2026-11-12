@@ -43,8 +43,26 @@ export class TasksComponent implements OnInit {
   }
 
   get visibleTasks(): Task[] {
+    return this.tasksFor(this.filter);
+  }
+
+  get completedCount(): number {
+    return this.countFor('completed');
+  }
+
+  // Porcentaje de tareas completadas, para la barra de progreso
+  get progress(): number {
+    const total = this.tasks?.length ?? 0;
+    return total === 0 ? 0 : Math.round(this.completedCount / total * 100);
+  }
+
+  countFor(filter: Filter): number {
+    return this.tasksFor(filter).length;
+  }
+
+  private tasksFor(filter: Filter): Task[] {
     const tasks = this.tasks ?? [];
-    switch (this.filter) {
+    switch (filter) {
       case 'pending':
         return tasks.filter(task => !task.completed);
       case 'completed':

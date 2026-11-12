@@ -1,42 +1,91 @@
-<p class="notice" *ngIf="!online">
-  Sin conexión. Si las tareas se consultaron antes, se muestran las guardadas.
-</p>
+<div class="banner notice" *ngIf="!online" role="status">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M2 8.8a15 15 0 0 1 20 0M5.5 12.4a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0M12 20h.01M3 3l18 18" />
+  </svg>
+  <p><strong>Sin conexión.</strong> Si las tareas se consultaron antes, se muestran las guardadas.</p>
+</div>
 
-<div class="toolbar">
-  <div class="filters" role="group" aria-label="Filtrar tareas">
-    <button
-      *ngFor="let option of filters"
-      type="button"
-      class="filter"
-      [class.active]="filter === option.value"
-      [attr.aria-pressed]="filter === option.value"
-      (click)="filter = option.value">
-      {{ option.label }}
+<section class="summary" *ngIf="tasks && tasks.length > 0" aria-label="Progreso">
+  <div class="summary__text">
+    <p class="summary__count">{{ completedCount }} de {{ tasks.length }}</p>
+    <p class="summary__label">tareas completadas</p>
+  </div>
+  <p class="summary__percent">{{ progress }} %</p>
+  <div
+    class="progress"
+    role="progressbar"
+    aria-label="Tareas completadas"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    [attr.aria-valuenow]="progress">
+    <span class="progress__bar" [style.width.%]="progress"></span>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="toolbar">
+    <div class="filters" role="group" aria-label="Filtrar tareas">
+      <button
+        *ngFor="let option of filters"
+        type="button"
+        class="filter"
+        [class.active]="filter === option.value"
+        [attr.aria-pressed]="filter === option.value"
+        (click)="filter = option.value">
+        {{ option.label }}
+        <span class="filter__count" *ngIf="tasks">{{ countFor(option.value) }}</span>
+      </button>
+    </div>
+    <button type="button" class="refresh" [class.is-loading]="loading" (click)="loadTasks()" [disabled]="loading">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" />
+      </svg>
+      Actualizar
     </button>
   </div>
-  <button type="button" (click)="loadTasks()" [disabled]="loading">Actualizar</button>
-</div>
 
-<p class="status" *ngIf="loading">Cargando tareas…</p>
+  <div class="banner error" *ngIf="error" role="alert">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 8v5M12 16.5h.01M10.3 3.9L2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    </svg>
+    <p>{{ error }}</p>
+    <button type="button" class="banner__action" (click)="loadTasks()" [disabled]="loading">Reintentar</button>
+  </div>
 
-<div class="error" *ngIf="error" role="alert">
-  <span>{{ error }}</span>
-  <button type="button" (click)="loadTasks()" [disabled]="loading">Reintentar</button>
-</div>
-
-<ng-container *ngIf="tasks">
-  <p class="status" *ngIf="loadedAt">Datos obtenidos a las {{ loadedAt | date: 'HH:mm' }}.</p>
-
-  <p class="empty" *ngIf="tasks.length === 0">No hay tareas.</p>
-  <p class="empty" *ngIf="tasks.length > 0 && visibleTasks.length === 0">
-    {{ filter === 'pending' ? 'No hay tareas pendientes.' : 'No hay tareas completadas.' }}
-  </p>
-
-  <ul class="tasks">
-    <li *ngFor="let task of visibleTasks; trackBy: trackById" [class.done]="task.completed">
-      <span class="check" aria-hidden="true">{{ task.completed ? '✓' : '' }}</span>
-      <span class="title">{{ task.title }}</span>
-      <span class="visually-hidden">{{ task.completed ? '(completada)' : '(pendiente)' }}</span>
-    </li>
+  <ul class="skeleton" *ngIf="loading && !tasks" aria-hidden="true">
+    <li></li>
+    <li></li>
+    <li></li>
   </ul>
-</ng-container>
+
+  <ng-container *ngIf="tasks">
+    <div class="empty" *ngIf="visibleTasks.length === 0">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 4h6M8 4H6a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2M9 12h6M9 16h4" />
+      </svg>
+      <p *ngIf="tasks.length === 0">No hay tareas.</p>
+      <p *ngIf="tasks.length > 0">
+        {{ filter === 'pending' ? 'No hay tareas pendientes.' : 'No hay tareas completadas.' }}
+      </p>
+    </div>
+
+    <ul class="tasks">
+      <li *ngFor="let task of visibleTasks; trackBy: trackById" class="task" [class.done]="task.completed">
+        <span class="task__check" aria-hidden="true">
+          <svg *ngIf="task.completed" viewBox="0 0 24 24"><path d="M6 12.5l4 4L18 8.5" /></svg>
+        </span>
+        <span class="task__title">{{ task.title }}</span>
+        <span class="task__badge">{{ task.completed ? 'Completada' : 'Pendiente' }}</span>
+      </li>
+    </ul>
+  </ng-container>
+
+  <p class="panel__footer">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+    </svg>
+    <span *ngIf="loading">Cargando tareas…</span>
+    <span *ngIf="!loading && loadedAt">Datos obtenidos a las {{ loadedAt | date: 'HH:mm' }}.</span>
+    <span *ngIf="!loading && !loadedAt">Todavía no se obtuvieron datos.</span>
+  </p>
+</section>
